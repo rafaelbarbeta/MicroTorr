@@ -22,3 +22,4 @@ go.work
 
 # Files for testing the app
 test_file
+*.mtorrent

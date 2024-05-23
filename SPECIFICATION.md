@@ -13,16 +13,18 @@ The .mtorrent file structure only has the basic features of a common .torrent fi
 
 * info, which contains the values: length, name, piece length, pieces, id_hash
 
-piece length will be set as 512kB for the test file
+piece length will be set as 1M for the test file
 pieces is a concatenation of all SHA1 hashes 
 id_hash is a simplification, it is instead the SHA1 hash of the whole file, which will be used as an identification for this file in the swarm
+
 
 ### Tracker
 
 The Tracker provides just one simple service with the following parameters:
 
 GET /annouce
-* info_hash: 20-byte SHA-1 hash of the info dictionary from the .torrent file.
+* info_hash: 20-byte SHA-1 hash of the info dictionary from the .mtorrent file.
+In this case, is id_hash.
 * peer_id: 20 byte randomly generated id
 * ip: peer ip
 * port: The port number the peer is listening on.
@@ -40,7 +42,8 @@ The response is a json that contains only the peers, their listening ports, and 
 } 
 ```
 
-Peers in MicroTorr will always connect to all other available peers
+Peers in MicroTorr will always connect to all other available peers.
+Peers are supossed to continue sending GET requests, with the same parameters and event "ping". Peers that do not send a GET request within a time span of 5 minutes, will be considered dead, and removed from peers list. BitTorrent usually set this value to about 30 minutes
 
 ### Messages
 
