@@ -1,5 +1,5 @@
 /*
-Copyright © 2024 NAME HERE <EMAIL ADDRESS>
+Copyright © 2024 Rafael Barbeta rafa.barbeta@gmail.com
 */
 package cmd
 
@@ -17,12 +17,7 @@ var loadMtorrCmd = &cobra.Command{
 	Long:  `Load a .mtorrent file, and show its information.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		mtorrent := mtorr.LoadMtorrent(args[0])
-		fmt.Println("Tracker Link:", mtorrent.Announce)
-		fmt.Println("File Name:", mtorrent.Info.Name)
-		fmt.Println("File Length:", mtorrent.Info.Length)
-		fmt.Println("Piece Length:", mtorrent.Info.Piece_length)
-		fmt.Println("Sha1sum (first 20 bytes):", mtorrent.Info.Sha1sum[:20])
-		fmt.Println("Id Hash:", mtorrent.Info.Id)
+		fmt.Println(mtorrent)
 	},
 }
 

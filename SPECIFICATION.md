@@ -28,7 +28,7 @@ In this case, is id_hash.
 * peer_id: 20 byte randomly generated id
 * ip: peer ip
 * port: The port number the peer is listening on.
-* event: The event type "started", "stopped", "completed".
+* event: The event type "started", "stopped", "completed", "alive".
 
 Note that many parameters, such as downloaded bytes and remaining bytes are removed from this simplistic implementation
 
@@ -43,7 +43,7 @@ The response is a json that contains only the peers, their listening ports, and 
 ```
 
 Peers in MicroTorr will always connect to all other available peers.
-Peers are supossed to continue sending GET requests, with the same parameters and event "ping". Peers that do not send a GET request within a time span of 5 minutes, will be considered dead, and removed from peers list. BitTorrent usually set this value to about 30 minutes
+Peers are supossed to continue sending GET requests, with the same parameters and event "alive". Peers that do not send a GET request within a time span of 30 seconds, will be considered dead, and removed from peers list. BitTorrent usually set this value to about 30 minutes
 
 ### Messages
 
@@ -51,16 +51,16 @@ After connecting to a peer, the client will send a handshake, and wait for its p
 * pstrlen: string length of pstr, as a single raw byte (integer 11)
 * pstr: string identifier of the protocol, this will be "MICROTORRv1"
 * reserved: eight (8) reserved bytes. All current implementations use all zeroes.
-* info_hash: 20-byte SHA1 hash of the info key in the metainfo file. This is the same info_hash that is transmitted in tracker requests.
+* info_hash: 20-byte SHA1 hash of the info key in the metainfo file. This is the same info_hash that is transmitted in tracker requests (in this case, is the file id)
 * peer_id: 20-byte string used as a unique ID for the client.
 
 The messages also follow the original specification, with prefix_length, message ID, payload. Prefix length has 4 bytes of size and message ID only has 1. Payload size is message dependant. For the sake of simplicity, choke, unchoke, cancel, interested and not interested message types are stripped from this implementation. The specific behaviour will be discussed in the next topic. Also, a new message "reject" is added. The message type are as follow:
 
 * have len=0005 id=1 pieceindex: Advertise to other peers a newer download piece, so they can update which peers have which pieces
 * bitfield len=0001+X, id=2, bitfield: indicates all the pieces a peer has or not. Is sent always when a new connection is made, and only once.
-* request: len=009, id=3, index, length: Used to request a block. Note that the field begin does not exist in this implementation
-* reject: len=004, index: Used to inform the requesting peer that the block cannot yet be sent. This will cause the other peer to choose another piece with a "lower rarity" until find someone that can sent him the piece. This is a simplification of the original protocol
-* piece: len=0005+X, id=7, index, block: The actual block piece.
+* request: len=013, id=3, index, begin, length: Used to request a block.
+* reject: len=005, id=4, index: Used to inform the requesting peer that the block cannot yet be sent. This will cause the other peers to choose another piece with a "lower rarity" until find someone that can sent him the piece. This is a simplification of the original protocol
+* piece: len=0009+X, id=7, index, begin, block: The actual block piece
 
 ### Torrent Client
 

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/jackpal/bencode-go"
+	"github.com/rafaelbarbeta/MicroTorr/pkg/utils"
 )
 
 const ()
@@ -25,34 +26,16 @@ type Info struct {
 	Id           string
 }
 
-func check(e error, message ...string) {
-	if e != nil {
-		fmt.Println(strings.Join(message, " "))
-		panic(e)
-	}
-}
-
-func printVerbose(verbose bool, message ...interface{}) {
-	if verbose {
-		var sb strings.Builder
-		sb.WriteString("[INFO]: ")
-		for _, m := range message {
-			sb.WriteString(fmt.Sprintf("%v", m))
-		}
-		fmt.Println(sb.String())
-	}
-}
-
-func GenMtorrent(fileName string, tracker string, pieceLength int, verbose bool) {
+func GenMtorrent(fileName string, tracker string, pieceLength int, verbose int) {
 	var sha1hash strings.Builder
 	var bencodeBuffer bytes.Buffer
 	mtorrent := Mtorrent{}
 
-	printVerbose(verbose, "Reading file", fileName)
+	utils.PrintVerbose(verbose, utils.DEBUG, "Reading file", fileName)
 	data, err := os.ReadFile(fileName)
-	check(err, "Error reading file")
+	utils.Check(err, "Error reading file")
 	length := len(data)
-	printVerbose(verbose, "File length:", length)
+	utils.PrintVerbose(verbose, utils.INFORMATION, "File length:", length)
 
 	mtorrent.Announce = tracker
 	mtorrent.Info.Length = length
@@ -60,28 +43,41 @@ func GenMtorrent(fileName string, tracker string, pieceLength int, verbose bool)
 	mtorrent.Info.Piece_length = pieceLength
 
 	for i := 0; i < length; i += pieceLength {
-		printVerbose(verbose, "Piece", i/pieceLength)
+		utils.PrintVerbose(verbose, utils.DEBUG, "Piece", i/pieceLength)
 		sha1hash.WriteString(fmt.Sprintf("%x", sha1.Sum(data[i:i+pieceLength])))
 	}
 
 	mtorrent.Info.Sha1sum = sha1hash.String()
 	mtorrent.Info.Id = fmt.Sprintf("%x", sha1.Sum(data))
+	utils.PrintVerbose(verbose, utils.VERBOSE, "Mtorrent:", mtorrent)
 
 	// Bencode the Mtorrent
 	err = bencode.Marshal(&bencodeBuffer, mtorrent)
-	check(err, "Error bencoding Mtorrent")
+	utils.Check(err, "Error bencoding Mtorrent")
 
 	err = os.WriteFile(fileName+".mtorrent", bencodeBuffer.Bytes(), 0644)
-	check(err, "Error writing Mtorrent")
+	utils.Check(err, "Error writing Mtorrent")
 }
 
 func LoadMtorrent(fileName string) Mtorrent {
 	mtorrent := Mtorrent{}
 	file, err := os.Open(fileName)
-	check(err, "Error opening Mtorrent", fileName)
+	utils.Check(err, "Error opening Mtorrent", fileName)
 	err = bencode.Unmarshal(file, &mtorrent)
-	check(err, "Error unmarshalling Mtorrent", fileName)
+	utils.Check(err, "Error unmarshalling Mtorrent", fileName)
 	file.Close()
 
 	return mtorrent
+}
+
+func (mtorrent Mtorrent) String() string {
+	var mtorrentString string
+	mtorrentString += fmt.Sprintln("Tracker Link:", mtorrent.Announce)
+	mtorrentString += fmt.Sprintln("Tracker Link:", mtorrent.Announce)
+	mtorrentString += fmt.Sprintln("File Name:", mtorrent.Info.Name)
+	mtorrentString += fmt.Sprintln("File Length:", mtorrent.Info.Length)
+	mtorrentString += fmt.Sprintln("Piece Length:", mtorrent.Info.Piece_length)
+	mtorrentString += fmt.Sprintln("Sha1sum (first 20 bytes):", mtorrent.Info.Sha1sum[:20])
+	mtorrentString += fmt.Sprint("Id Hash:", mtorrent.Info.Id)
+	return mtorrentString
 }

@@ -1,5 +1,5 @@
 /*
-Copyright © 2024 NAME HERE <EMAIL ADDRESS>
+Copyright © 2024 Rafael Barbeta rafa.barbeta@gmail.com
 */
 package cmd
 
@@ -31,5 +31,5 @@ Once it is activated, it will bind to port 8888 by default.`,
 func init() {
 	rootCmd.AddCommand(trackerCmd)
 
-	trackerCmd.Flags().StringP("bind", "b", "0.0.0.0:8888", "Specify the address to bind. Default: 0.0.0.0:8888")
+	trackerCmd.Flags().StringP("bind", "b", "0.0.0.0:8888", "Specify the address to bind")
 }
