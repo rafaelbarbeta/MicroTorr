@@ -29,7 +29,7 @@ to quickly create a Cobra application.`,
 
 func init() {
 	rootCmd.AddCommand(createMtorrCmd)
-	createMtorrCmd.Flags().StringP("tracker", "t", "http://tracker-microtorr:8080", "Specify a URL tracker for this file. Default: http://tracker-microtorr:8080")
+	createMtorrCmd.Flags().StringP("tracker", "t", "http://tracker-microtorr:8888", "Specify a URL tracker for this file")
 	createMtorrCmd.Flags().IntP("pieceLength", "l", 1000000, "Specify the length of each piece. Default: 1M")
 	createMtorrCmd.Flags().IntP("verbose", "v", 0, "Choses verbosity level.")
 }

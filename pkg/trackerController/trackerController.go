@@ -16,25 +16,22 @@ func GetTrackerInfo(url, id, swarmId, ip, port string, verbosity int) tracker.Sw
 		id, swarmId, ip, port)
 
 	utils.PrintVerbose(verbosity, utils.VERBOSE, "Requesting: ", urlParameters)
-	response, err := http.Get(url)
-	utils.Check(err, "Error requesting", urlParameters)
-	var buffer []byte
+	response, err := http.Get(urlParameters)
+	utils.Check(err, verbosity, "Error requesting ", urlParameters)
 	var swarm tracker.Swarm
-	_, err = response.Body.Read(buffer)
-	utils.Check(err, "Error reading response Body")
-	err = json.Unmarshal(buffer, &swarm)
-	utils.Check(err, "Error unmarshalling JSON response")
+	err = json.NewDecoder(response.Body).Decode(&swarm)
+	utils.Check(err, verbosity, "Error decoding JSON response")
 
 	return swarm
 }
 
 func InitTrackerController(url, id, swarmId, ip, port string, verbosity int, stopChan chan bool) {
-	timer := time.NewTimer(tracker.ALIVE_TIMER - 5)
+	timer := time.NewTimer(tracker.ALIVE_TIMER - 15*time.Second)
 	for {
 		select {
 		case <-timer.C:
 			KeepAlive(url, id, swarmId, ip, port, verbosity)
-			timer.Reset(tracker.ALIVE_TIMER - 5)
+			timer.Reset(tracker.ALIVE_TIMER - 15*time.Second)
 		case <-stopChan:
 			timer.Stop()
 			return
@@ -48,6 +45,6 @@ func KeepAlive(url, id, swarmId, ip, port string, verbosity int) {
 		id, swarmId, ip, port)
 
 	utils.PrintVerbose(verbosity, utils.DEBUG, "Keeping Alive: ", urlParameters)
-	_, err := http.Get(url)
-	utils.Check(err, "Error, keep alive failed")
+	_, err := http.Get(urlParameters)
+	utils.Check(err, verbosity, "Error: keep alive failed!")
 }

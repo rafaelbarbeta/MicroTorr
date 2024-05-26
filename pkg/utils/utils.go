@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"os"
 	"strings"
+	"time"
 )
 
 // Verbosity levels for PrintVerbose
@@ -15,10 +17,14 @@ const (
 	VERBOSE     = 1  // Peint if verbose 1
 )
 
-func Check(e error, message ...string) {
+func Check(e error, verbosity int, message ...string) {
 	if e != nil {
 		fmt.Println(strings.Join(message, " "))
-		panic(e)
+		if verbosity >= DEBUG {
+			panic(e)
+		} else {
+			os.Exit(-1)
+		}
 	}
 }
 
@@ -50,8 +56,9 @@ func PrintVerbose(verbosity, priority int, message ...interface{}) {
 func GenerateRandomString(n int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	b := make([]byte, n)
+	random := rand.New(rand.NewSource(time.Now().UnixNano()))
 	for i := range b {
-		b[i] = charset[rand.Intn(len(charset))]
+		b[i] = charset[random.Intn(len(charset))]
 	}
 	return string(b)
 }

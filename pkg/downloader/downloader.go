@@ -2,6 +2,7 @@ package downloader
 
 import (
 	//"net/http"
+
 	"math"
 	"sync"
 
@@ -15,11 +16,10 @@ import (
 )
 
 const (
-	ID_LENGTH    = 20
-	DEFAULT_PORT = "7777"
+	ID_LENGTH = 20
 )
 
-func Download(mtorrent mtorr.Mtorrent, intNet string, verbosity int) {
+func Download(mtorrent mtorr.Mtorrent, intNet, port string, verbosity int) {
 	var ip string
 	var err error
 	var PeerPieces internal.SyncPeerPieces
@@ -28,10 +28,10 @@ func Download(mtorrent mtorr.Mtorrent, intNet string, verbosity int) {
 	var wait sync.WaitGroup
 	if intNet != "" {
 		ip, err = utils.GetInterfaceIP(intNet)
-		utils.Check(err, "Error getting interface IP", intNet)
+		utils.Check(err, verbosity, "Error getting interface IP", intNet)
 	} else {
 		ip, err = utils.GetDefaultRouteIP()
-		utils.Check(err, "Error getting IP from default route")
+		utils.Check(err, verbosity, "Error getting IP from default route")
 	}
 
 	peerId := utils.GenerateRandomString(ID_LENGTH)
@@ -42,7 +42,7 @@ func Download(mtorrent mtorr.Mtorrent, intNet string, verbosity int) {
 		peerId,
 		mtorrent.Info.Id,
 		ip,
-		DEFAULT_PORT,
+		port,
 		verbosity)
 	utils.PrintVerbose(verbosity, utils.VERBOSE, "Swarm obtained sucessfully:", swarm)
 	PeerPieces = internal.SyncPeerPieces{
@@ -61,12 +61,13 @@ func Download(mtorrent mtorr.Mtorrent, intNet string, verbosity int) {
 		Rarity: make([][]int, len(swarm.Peers)+1),
 		Lock:   sync.RWMutex{},
 	}
-	utils.PrintVerbose(verbosity, utils.INFORMATION, "All Structures Initialized")
+	utils.PrintVerbose(verbosity, utils.VERBOSE, "All Structures Initialized")
 	chanCoordPieceMng := make(chan internal.ControlMessage)
 	chanCoordPeerMng := make(chan internal.ControlMessage)
 	chanPeerMngPieceMng := make(chan internal.ControlMessage)
 	chanTracker := make(chan bool)
 
+	utils.PrintVerbose(verbosity, utils.VERBOSE, "Starting all components")
 	wait.Add(1)
 	// Initializes all components in separated go routines
 	go trackercontroller.InitTrackerController(
@@ -74,7 +75,7 @@ func Download(mtorrent mtorr.Mtorrent, intNet string, verbosity int) {
 		peerId,
 		mtorrent.Info.Id,
 		ip,
-		DEFAULT_PORT,
+		port,
 		verbosity,
 		chanTracker,
 	)
@@ -83,6 +84,8 @@ func Download(mtorrent mtorr.Mtorrent, intNet string, verbosity int) {
 		chanPeerMngPieceMng,
 		chanCoordPeerMng,
 		swarm,
+		peerId,
+		verbosity,
 	)
 
 	go coordinator.InitCoordinator(
@@ -92,6 +95,7 @@ func Download(mtorrent mtorr.Mtorrent, intNet string, verbosity int) {
 		chanCoordPeerMng,
 		chanCoordPieceMng,
 		&wait,
+		verbosity,
 	)
 
 	go pieceManager.InitPieceManager(
@@ -100,6 +104,7 @@ func Download(mtorrent mtorr.Mtorrent, intNet string, verbosity int) {
 		&PieceRarity,
 		chanCoordPieceMng,
 		chanPeerMngPieceMng,
+		verbosity,
 	)
 
 	wait.Wait()

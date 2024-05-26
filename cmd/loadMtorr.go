@@ -16,11 +16,14 @@ var loadMtorrCmd = &cobra.Command{
 	Short: "Load a .mtorrent file",
 	Long:  `Load a .mtorrent file, and show its information.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		mtorrent := mtorr.LoadMtorrent(args[0])
+		verbosity, _ := cmd.Flags().GetInt("verbosity")
+		mtorrent := mtorr.LoadMtorrent(args[0], verbosity)
 		fmt.Println(mtorrent)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(loadMtorrCmd)
+
+	loadMtorrCmd.Flags().IntP("verbosity", "v", 0, "Choses verbosity level.")
 }

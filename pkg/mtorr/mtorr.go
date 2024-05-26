@@ -33,7 +33,7 @@ func GenMtorrent(fileName string, tracker string, pieceLength int, verbose int) 
 
 	utils.PrintVerbose(verbose, utils.DEBUG, "Reading file", fileName)
 	data, err := os.ReadFile(fileName)
-	utils.Check(err, "Error reading file")
+	utils.Check(err, verbose, "Error reading file")
 	length := len(data)
 	utils.PrintVerbose(verbose, utils.INFORMATION, "File length:", length)
 
@@ -53,18 +53,18 @@ func GenMtorrent(fileName string, tracker string, pieceLength int, verbose int) 
 
 	// Bencode the Mtorrent
 	err = bencode.Marshal(&bencodeBuffer, mtorrent)
-	utils.Check(err, "Error bencoding Mtorrent")
+	utils.Check(err, verbose, "Error bencoding Mtorrent")
 
 	err = os.WriteFile(fileName+".mtorrent", bencodeBuffer.Bytes(), 0644)
-	utils.Check(err, "Error writing Mtorrent")
+	utils.Check(err, verbose, "Error writing Mtorrent")
 }
 
-func LoadMtorrent(fileName string) Mtorrent {
+func LoadMtorrent(fileName string, verbosity int) Mtorrent {
 	mtorrent := Mtorrent{}
 	file, err := os.Open(fileName)
-	utils.Check(err, "Error opening Mtorrent", fileName)
+	utils.Check(err, verbosity, "Error opening Mtorrent", fileName)
 	err = bencode.Unmarshal(file, &mtorrent)
-	utils.Check(err, "Error unmarshalling Mtorrent", fileName)
+	utils.Check(err, verbosity, "Error unmarshalling Mtorrent", fileName)
 	file.Close()
 
 	return mtorrent
@@ -72,7 +72,6 @@ func LoadMtorrent(fileName string) Mtorrent {
 
 func (mtorrent Mtorrent) String() string {
 	var mtorrentString string
-	mtorrentString += fmt.Sprintln("Tracker Link:", mtorrent.Announce)
 	mtorrentString += fmt.Sprintln("Tracker Link:", mtorrent.Announce)
 	mtorrentString += fmt.Sprintln("File Name:", mtorrent.Info.Name)
 	mtorrentString += fmt.Sprintln("File Length:", mtorrent.Info.Length)
