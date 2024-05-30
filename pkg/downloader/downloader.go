@@ -3,28 +3,25 @@ package downloader
 import (
 	//"net/http"
 
-	"math"
 	"sync"
 
-	"github.com/rafaelbarbeta/MicroTorr/pkg/coordinator"
+	"github.com/rafaelbarbeta/MicroTorr/pkg/core"
 	"github.com/rafaelbarbeta/MicroTorr/pkg/internal"
 	"github.com/rafaelbarbeta/MicroTorr/pkg/mtorr"
-	"github.com/rafaelbarbeta/MicroTorr/pkg/peerController"
-	"github.com/rafaelbarbeta/MicroTorr/pkg/pieceManager"
+	"github.com/rafaelbarbeta/MicroTorr/pkg/peerWire"
 	trackercontroller "github.com/rafaelbarbeta/MicroTorr/pkg/trackerController"
 	"github.com/rafaelbarbeta/MicroTorr/pkg/utils"
 )
 
 const (
-	ID_LENGTH = 20
+	ID_LENGTH         = 20
+	MAX_CHAN_TRACKER  = 100
+	MAX_CHAN_MESSAGES = 1000
 )
 
 func Download(mtorrent mtorr.Mtorrent, intNet, port string, verbosity int) {
 	var ip string
 	var err error
-	var PeerPieces internal.SyncPeerPieces
-	var PeerSpeeds internal.SyncPeerSpeeds
-	var PieceRarity internal.SyncPieceRarity
 	var wait sync.WaitGroup
 	if intNet != "" {
 		ip, err = utils.GetInterfaceIP(intNet)
@@ -36,6 +33,8 @@ func Download(mtorrent mtorr.Mtorrent, intNet, port string, verbosity int) {
 
 	peerId := utils.GenerateRandomString(ID_LENGTH)
 
+	utils.PrintVerbose(verbosity, utils.VERBOSE, "My Peer Id (Capped):", peerId[:5])
+
 	utils.PrintVerbose(verbosity, utils.VERBOSE, "Using IP:", ip)
 	swarm := trackercontroller.GetTrackerInfo(
 		mtorrent.Announce,
@@ -44,31 +43,14 @@ func Download(mtorrent mtorr.Mtorrent, intNet, port string, verbosity int) {
 		ip,
 		port,
 		verbosity)
-	utils.PrintVerbose(verbosity, utils.VERBOSE, "Swarm obtained sucessfully:", swarm)
-	PeerPieces = internal.SyncPeerPieces{
-		Piece: make([][]string,
-			int(math.Ceil(
-				float64(mtorrent.Info.Length)/float64(mtorrent.Info.Piece_length)))),
-		Lock: sync.RWMutex{},
-	}
 
-	PeerSpeeds = internal.SyncPeerSpeeds{
-		Speed: make(map[string]float64),
-		Lock:  sync.RWMutex{},
-	}
+	chanTracker := make(chan internal.ControlMessage, MAX_CHAN_TRACKER)
+	chanPeerWire := make(chan internal.ControlMessage, MAX_CHAN_MESSAGES)
+	chanCore := make(chan internal.ControlMessage, MAX_CHAN_MESSAGES)
 
-	PieceRarity = internal.SyncPieceRarity{
-		Rarity: make([][]int, len(swarm.Peers)+1),
-		Lock:   sync.RWMutex{},
-	}
-	utils.PrintVerbose(verbosity, utils.VERBOSE, "All Structures Initialized")
-	chanCoordPieceMng := make(chan internal.ControlMessage)
-	chanCoordPeerMng := make(chan internal.ControlMessage)
-	chanPeerMngPieceMng := make(chan internal.ControlMessage)
-	chanTracker := make(chan bool)
-
-	utils.PrintVerbose(verbosity, utils.VERBOSE, "Starting all components")
-	wait.Add(1)
+	utils.PrintVerbose(verbosity, utils.INFORMATION, "All Structures Initialized")
+	utils.PrintVerbose(verbosity, utils.INFORMATION, "Starting components")
+	wait.Add(2)
 	// Initializes all components in separated go routines
 	go trackercontroller.InitTrackerController(
 		mtorrent.Announce,
@@ -80,30 +62,22 @@ func Download(mtorrent mtorr.Mtorrent, intNet, port string, verbosity int) {
 		chanTracker,
 	)
 
-	go peerController.InitPeerController(
-		chanPeerMngPieceMng,
-		chanCoordPeerMng,
+	go peerWire.InitPeerWire(
 		swarm,
 		peerId,
-		verbosity,
-	)
-
-	go coordinator.InitCoordinator(
-		&PeerPieces,
-		&PeerSpeeds,
-		&PieceRarity,
-		chanCoordPeerMng,
-		chanCoordPieceMng,
+		chanPeerWire,
+		chanCore,
 		&wait,
 		verbosity,
 	)
 
-	go pieceManager.InitPieceManager(
-		&PeerPieces,
-		&PeerSpeeds,
-		&PieceRarity,
-		chanCoordPieceMng,
-		chanPeerMngPieceMng,
+	go core.InitCore(
+		swarm,
+		chanPeerWire,
+		chanCore,
+		chanTracker,
+		peerId,
+		&wait,
 		verbosity,
 	)
 
