@@ -31,7 +31,7 @@ type Have struct {
 }
 
 type Bitfield struct {
-	Bitfield []byte
+	Bitfield []bool
 }
 
 type Request struct {

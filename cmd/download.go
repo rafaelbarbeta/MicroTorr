@@ -1,5 +1,5 @@
 /*
-Copyright © 2024 NAME HERE <EMAIL ADDRESS>
+Copyright © 2024 Rafael Barbeta rafa.barbeta@gmail.com
 */
 package cmd
 
@@ -26,27 +26,22 @@ to quickly create a Cobra application.`,
 		verbosity, _ := cmd.Flags().GetInt("verbose")
 		intNet, _ := cmd.Flags().GetString("interface")
 		port, _ := cmd.Flags().GetString("port")
+		seed, _ := cmd.Flags().GetString("seed")
+		autoSeed, _ := cmd.Flags().GetBool("autoSeed")
 		if len(args) < 1 {
 			fmt.Println("Error: You must specify a .mtorrent file")
 			os.Exit(1)
 		}
 		mtorrent := mtorr.LoadMtorrent(args[0], verbosity)
-		downloader.Download(mtorrent, intNet, port, verbosity)
+		downloader.Download(mtorrent, intNet, port, seed, autoSeed, verbosity)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(downloadCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// downloadCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
 	downloadCmd.Flags().IntP("verbose", "v", 0, "Choses verbosity level.")
 	downloadCmd.Flags().StringP("interface", "i", "", "Specify the interface to retrieve IP from")
 	downloadCmd.Flags().StringP("port", "p", "7777", "Specify the port to listen on for other peers in the swarm")
+	downloadCmd.Flags().StringP("seed", "s", "", "Seed the torrent swarm with specified complete file")
+	downloadCmd.Flags().BoolP("auto-seed", "a", true, "Wether to seed the file after download or not")
 }

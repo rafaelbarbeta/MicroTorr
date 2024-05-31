@@ -55,13 +55,18 @@ func InitPeerWire(
 		peerConn.conns[peer.Id] = conn
 		peerConn.send[peer.Id] = gob.NewEncoder(conn)
 		peerConn.receive[peer.Id] = gob.NewDecoder(conn)
-		_, err = PerfomHandshake(peerConn.send[peer.Id],
+		peerId, err := PerfomHandshake(peerConn.send[peer.Id],
 			peerConn.receive[peer.Id],
 			myId,
 			swarm.IdHash,
 			verbosity)
 		utils.Check(err, verbosity, "Error performing Handshake with peer: ", peer.Id[:5])
 		utils.PrintVerbose(verbosity, utils.VERBOSE, "Handshake with peer: ", peer.Id[:5], "sucessful")
+		chanPeerWire <- internal.ControlMessage{
+			Opcode:  internal.NEW_CONNECTION,
+			PeerId:  peerId,
+			Payload: nil,
+		}
 		go ListenForMessages(&peerConn, peer.Id, chanPeerWire, verbosity)
 	}
 

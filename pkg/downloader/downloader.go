@@ -19,7 +19,7 @@ const (
 	MAX_CHAN_MESSAGES = 1000
 )
 
-func Download(mtorrent mtorr.Mtorrent, intNet, port string, verbosity int) {
+func Download(mtorrent mtorr.Mtorrent, intNet, port, seed string, autoSeed bool, verbosity int) {
 	var ip string
 	var err error
 	var wait sync.WaitGroup
@@ -72,12 +72,14 @@ func Download(mtorrent mtorr.Mtorrent, intNet, port string, verbosity int) {
 	)
 
 	go core.InitCore(
-		swarm,
+		mtorrent,
 		chanPeerWire,
 		chanCore,
 		chanTracker,
 		peerId,
 		&wait,
+		seed,
+		autoSeed,
 		verbosity,
 	)
 

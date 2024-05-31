@@ -95,3 +95,23 @@ func GetInterfaceIP(name string) (string, error) {
 	}
 	return "", fmt.Errorf("no IPv4 address found for interface %s", name)
 }
+
+func Min(values []int) int {
+	min := values[0]
+	for _, v := range values {
+		if v < min {
+			min = v
+		}
+	}
+	return min
+}
+
+func RandomChoiceString(items []string) string {
+	rand.Seed(time.Now().UnixNano() + int64(len(items)))
+	return items[rand.Intn(len(items))]
+}
+
+func RandomChoiceInt(items []int) int {
+	rand.Seed(time.Now().UnixNano() + int64(len(items)))
+	return items[rand.Intn(len(items))]
+}
