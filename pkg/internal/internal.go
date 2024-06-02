@@ -36,8 +36,8 @@ type Bitfield struct {
 
 type Request struct {
 	PieceIndex int
-	Begin      int
-	Length     int
+	//Begin      int Depois...
+	//Length     int
 }
 
 type Reject struct {
@@ -46,8 +46,8 @@ type Reject struct {
 
 type Piece struct {
 	PieceIndex int
-	Offset     int
-	Data       []byte
+	//Offset     int
+	Data []byte
 }
 
 type HelloDebug struct {

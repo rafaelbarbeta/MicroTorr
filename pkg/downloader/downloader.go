@@ -3,7 +3,9 @@ package downloader
 import (
 	//"net/http"
 
+	"math/rand"
 	"sync"
+	"time"
 
 	"github.com/rafaelbarbeta/MicroTorr/pkg/core"
 	"github.com/rafaelbarbeta/MicroTorr/pkg/internal"
@@ -23,6 +25,9 @@ func Download(mtorrent mtorr.Mtorrent, intNet, port, seed string, autoSeed bool,
 	var ip string
 	var err error
 	var wait sync.WaitGroup
+
+	rand.Seed(time.Now().UnixNano())
+
 	if intNet != "" {
 		ip, err = utils.GetInterfaceIP(intNet)
 		utils.Check(err, verbosity, "Error getting interface IP", intNet)
@@ -50,7 +55,7 @@ func Download(mtorrent mtorr.Mtorrent, intNet, port, seed string, autoSeed bool,
 
 	utils.PrintVerbose(verbosity, utils.INFORMATION, "All Structures Initialized")
 	utils.PrintVerbose(verbosity, utils.INFORMATION, "Starting components")
-	wait.Add(2)
+	wait.Add(1)
 	// Initializes all components in separated go routines
 	go trackercontroller.InitTrackerController(
 		mtorrent.Announce,

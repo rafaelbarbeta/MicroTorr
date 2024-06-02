@@ -119,7 +119,7 @@ func ListenForMessages(
 		}
 		utils.Check(err, verbosity, "Error receiving message from peer", peerId[:5])
 		opcode := MessageOpcode(msg)
-		utils.PrintVerbose(verbosity, utils.DEBUG, "Received message from peer: ", peerId[:5], "with opcode: ", opcode)
+		utils.PrintVerbose(verbosity, utils.DEBUG, "Message from peer: ", peerId[:5], " opcode: ", opcode)
 		chanPeerWire <- internal.ControlMessage{
 			Opcode:  opcode,
 			PeerId:  peerId,
@@ -138,11 +138,7 @@ func ListenForCoreMessages(
 	var peerMsg internal.Message
 	for {
 		controlMsg = <-chanCore
-		// Checks if is Done already
-		if controlMsg.Opcode == internal.EXIT {
-			wait.Done()
-			return
-		}
+		utils.PrintVerbose(verbosity, utils.DEBUG, "Message from core to ", controlMsg.PeerId)
 		peerMsg = internal.Message{Data: controlMsg.Payload}
 		if controlMsg.PeerId == "" { // Empty string is used to broadcast message
 			peerConn.lock.Lock()

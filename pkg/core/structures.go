@@ -2,8 +2,10 @@ package core
 
 import (
 	"fmt"
+	"math"
 	"sync"
 
+	"github.com/rafaelbarbeta/MicroTorr/pkg/internal"
 	"github.com/rafaelbarbeta/MicroTorr/pkg/utils"
 )
 
@@ -16,13 +18,8 @@ type SyncPeerPieces struct {
 
 type PiecesBytes struct {
 	Pieces [][]byte
+	Hash   []string
 	Have   []bool
-}
-
-type TorrentControl struct {
-	DownloadingFromId string
-	UploadingToIds    []string
-	Lock              sync.RWMutex
 }
 
 /*
@@ -33,10 +30,10 @@ Returns the rarest pieces and the peers that have them.
 	 at least rareRank peers
 	 returns List of pieces indexes, paired with their peers, and the minimum rare rank
 */
-func (sp *SyncPeerPieces) RarestPieces(rareRank int) ([]int, [][]string, int) {
+func (sp *SyncPeerPieces) RarestPieces(PieceBytes *PiecesBytes, numberOfPieces int) ([]int, [][]string) {
 	sp.Lock.Lock()
-	rarities := make([]int, len(sp.Have))
-	peerHasPiece := make([][]string, len(sp.Have))
+	rarities := make([]int, numberOfPieces)
+	peerHasPiece := make([][]string, numberOfPieces)
 	rarePieces := make([]int, 0)
 	peerHasRarePiece := make([][]string, 0)
 	for peer, have := range sp.Have {
@@ -48,21 +45,16 @@ func (sp *SyncPeerPieces) RarestPieces(rareRank int) ([]int, [][]string, int) {
 		}
 	}
 	sp.Lock.Unlock()
-	var minRarity int
-	if rareRank == -1 {
-		minRarity = utils.Min(rarities)
-	} else {
-		minRarity = rareRank
-	}
+	minRarity := utils.Min(rarities)
 
 	for i := range rarities {
-		if rarities[i] == minRarity {
+		if rarities[i] == minRarity && !PieceBytes.Have[i] {
 			rarePieces = append(rarePieces, i)
 			peerHasRarePiece = append(peerHasRarePiece, peerHasPiece[i])
 		}
 	}
 
-	return rarePieces, peerHasRarePiece, minRarity
+	return rarePieces, peerHasRarePiece
 }
 
 func (sp *SyncPeerPieces) QuickestPeer(peers []string) string {
@@ -79,10 +71,27 @@ func (sp *SyncPeerPieces) QuickestPeer(peers []string) string {
 	sp.Lock.Unlock()
 	if quickestPeer == "" {
 		// Randomly choose a peer in peers
-		return utils.RandomChoiceString(peers)
+		chosenPeer, _ := utils.RandomChoiceString(peers)
+		return chosenPeer
 	} else {
 		return quickestPeer
 	}
+}
+
+func (sp *SyncPeerPieces) HasSeeder() bool {
+	for _, have := range sp.Have {
+		hasAllPieces := true
+		for _, truthValue := range have {
+			if !truthValue {
+				hasAllPieces = false
+				break
+			}
+		}
+		if hasAllPieces {
+			return true
+		}
+	}
+	return false
 }
 
 func (sp *SyncPeerPieces) SetSpeed(peerId string, speed float64) {
@@ -94,7 +103,7 @@ func (sp *SyncPeerPieces) SetSpeed(peerId string, speed float64) {
 func (sp *SyncPeerPieces) AddPeer(peerId string, numberOfPieces int) {
 	sp.Lock.Lock()
 	sp.Have[peerId] = make([]bool, numberOfPieces)
-	sp.Speed[peerId] = -1
+	sp.Speed[peerId] = math.MaxInt64 //
 	sp.Lock.Unlock()
 }
 
@@ -111,11 +120,21 @@ func (sp *SyncPeerPieces) AddPiece(peerId string, index int) {
 	sp.Lock.Unlock()
 }
 
+func (sp *SyncPeerPieces) SetBitfield(peerId string, bitfield internal.Bitfield) {
+	sp.Lock.Lock()
+	sp.Have[peerId] = bitfield.Bitfield
+	sp.Lock.Unlock()
+}
+
 func (p *PiecesBytes) GetPiece(index int) ([]byte, error) {
 	if !p.Have[index] {
 		return nil, fmt.Errorf("piece %d not found", index)
 	}
 	return p.Pieces[index], nil
+}
+
+func (p *PiecesBytes) AddHash(sha1Hash string, index int) {
+	p.Hash[index] = sha1Hash
 }
 
 func (p *PiecesBytes) AddPiece(piece []byte, index int) {

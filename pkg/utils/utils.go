@@ -97,6 +97,9 @@ func GetInterfaceIP(name string) (string, error) {
 }
 
 func Min(values []int) int {
+	if len(values) == 0 {
+		return -1
+	}
 	min := values[0]
 	for _, v := range values {
 		if v < min {
@@ -106,12 +109,25 @@ func Min(values []int) int {
 	return min
 }
 
-func RandomChoiceString(items []string) string {
-	rand.Seed(time.Now().UnixNano() + int64(len(items)))
-	return items[rand.Intn(len(items))]
+func ContainsString(array []string, item string) bool {
+	for _, v := range array {
+		if v == item {
+			return true
+		}
+	}
+	return false
 }
 
-func RandomChoiceInt(items []int) int {
-	rand.Seed(time.Now().UnixNano() + int64(len(items)))
-	return items[rand.Intn(len(items))]
+func RandomChoiceString(items []string) (string, int) {
+	idx := rand.Intn(len(items))
+	return items[idx], idx
+}
+
+func RandomChoiceInt(items []int) (int, int) {
+	idx := rand.Intn(len(items))
+	return items[idx], idx
+}
+
+func RandomPercentChance(percent float64) bool {
+	return rand.Float64() <= percent
 }
