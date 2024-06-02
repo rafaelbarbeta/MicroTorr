@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/rafaelbarbeta/MicroTorr/pkg/core"
-	"github.com/rafaelbarbeta/MicroTorr/pkg/internal"
+	"github.com/rafaelbarbeta/MicroTorr/pkg/messages"
 	"github.com/rafaelbarbeta/MicroTorr/pkg/mtorr"
 	"github.com/rafaelbarbeta/MicroTorr/pkg/peerWire"
 	trackercontroller "github.com/rafaelbarbeta/MicroTorr/pkg/trackerController"
@@ -49,9 +49,9 @@ func Download(mtorrent mtorr.Mtorrent, intNet, port, seed string, autoSeed bool,
 		port,
 		verbosity)
 
-	chanTracker := make(chan internal.ControlMessage, MAX_CHAN_TRACKER)
-	chanPeerWire := make(chan internal.ControlMessage, MAX_CHAN_MESSAGES)
-	chanCore := make(chan internal.ControlMessage, MAX_CHAN_MESSAGES)
+	chanTracker := make(chan messages.ControlMessage, MAX_CHAN_TRACKER)
+	chanPeerWire := make(chan messages.ControlMessage, MAX_CHAN_MESSAGES)
+	chanCore := make(chan messages.ControlMessage, MAX_CHAN_MESSAGES)
 
 	utils.PrintVerbose(verbosity, utils.INFORMATION, "All Structures Initialized")
 	utils.PrintVerbose(verbosity, utils.INFORMATION, "Starting components")

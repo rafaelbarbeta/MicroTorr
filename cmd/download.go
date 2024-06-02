@@ -27,7 +27,7 @@ to quickly create a Cobra application.`,
 		intNet, _ := cmd.Flags().GetString("interface")
 		port, _ := cmd.Flags().GetString("port")
 		seed, _ := cmd.Flags().GetString("seed")
-		autoSeed, _ := cmd.Flags().GetBool("autoSeed")
+		autoSeed, _ := cmd.Flags().GetBool("auto-seed")
 		if len(args) < 1 {
 			fmt.Println("Error: You must specify a .mtorrent file")
 			os.Exit(1)
@@ -43,5 +43,5 @@ func init() {
 	downloadCmd.Flags().StringP("interface", "i", "", "Specify the interface to retrieve IP from")
 	downloadCmd.Flags().StringP("port", "p", "7777", "Specify the port to listen on for other peers in the swarm")
 	downloadCmd.Flags().StringP("seed", "s", "", "Seed the torrent swarm with specified complete file")
-	downloadCmd.Flags().BoolP("auto-seed", "a", true, "Wether to seed the file after download or not")
+	downloadCmd.Flags().BoolP("auto-seed", "a", false, "Wether to seed the file after download or not")
 }

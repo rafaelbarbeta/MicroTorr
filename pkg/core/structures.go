@@ -5,11 +5,11 @@ import (
 	"math"
 	"sync"
 
-	"github.com/rafaelbarbeta/MicroTorr/pkg/internal"
+	"github.com/rafaelbarbeta/MicroTorr/pkg/messages"
 	"github.com/rafaelbarbeta/MicroTorr/pkg/utils"
 )
 
-// Internal Structures
+// messages Structures
 type SyncPeerPieces struct {
 	Have  map[string][]bool
 	Speed map[string]float64
@@ -20,6 +20,12 @@ type PiecesBytes struct {
 	Pieces [][]byte
 	Hash   []string
 	Have   []bool
+}
+
+type SeedMode struct {
+	SeedFile string
+	active   bool
+	auto     bool
 }
 
 /*
@@ -120,7 +126,7 @@ func (sp *SyncPeerPieces) AddPiece(peerId string, index int) {
 	sp.Lock.Unlock()
 }
 
-func (sp *SyncPeerPieces) SetBitfield(peerId string, bitfield internal.Bitfield) {
+func (sp *SyncPeerPieces) SetBitfield(peerId string, bitfield messages.Bitfield) {
 	sp.Lock.Lock()
 	sp.Have[peerId] = bitfield.Bitfield
 	sp.Lock.Unlock()

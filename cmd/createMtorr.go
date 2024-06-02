@@ -4,6 +4,9 @@ Copyright © 2024 Rafael Barbeta rafa.barbeta@gmail.com
 package cmd
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/rafaelbarbeta/MicroTorr/pkg/mtorr"
 
 	"github.com/spf13/cobra"
@@ -23,6 +26,10 @@ to quickly create a Cobra application.`,
 		tracker, _ := cmd.Flags().GetString("tracker")
 		pieceLength, _ := cmd.Flags().GetInt("pieceLength")
 		verbose, _ := cmd.Flags().GetInt("verbose")
+		if len(args) < 1 {
+			fmt.Println("Error: You need to specify a file to create torrent from")
+			os.Exit(1)
+		}
 		mtorr.GenMtorrent(args[0], tracker, pieceLength, verbose)
 	},
 }

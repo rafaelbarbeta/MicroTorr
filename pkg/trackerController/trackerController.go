@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/rafaelbarbeta/MicroTorr/pkg/internal"
+	"github.com/rafaelbarbeta/MicroTorr/pkg/messages"
 	"github.com/rafaelbarbeta/MicroTorr/pkg/tracker"
 	"github.com/rafaelbarbeta/MicroTorr/pkg/utils"
 )
@@ -26,7 +26,7 @@ func GetTrackerInfo(url, id, swarmId, ip, port string, verbosity int) tracker.Sw
 	return swarm
 }
 
-func InitTrackerController(url, id, swarmId, ip, port string, verbosity int, stopChan chan internal.ControlMessage) {
+func InitTrackerController(url, id, swarmId, ip, port string, verbosity int, stopChan chan messages.ControlMessage) {
 	timer := time.NewTimer(tracker.ALIVE_TIMER - 15*time.Second)
 	for {
 		select {

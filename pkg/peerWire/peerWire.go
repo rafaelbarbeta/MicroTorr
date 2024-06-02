@@ -3,12 +3,11 @@ package peerWire
 import (
 	"encoding/gob"
 	"fmt"
-	"io"
 	"net"
 	"strconv"
 	"sync"
 
-	"github.com/rafaelbarbeta/MicroTorr/pkg/internal"
+	"github.com/rafaelbarbeta/MicroTorr/pkg/messages"
 	"github.com/rafaelbarbeta/MicroTorr/pkg/tracker"
 	"github.com/rafaelbarbeta/MicroTorr/pkg/utils"
 )
@@ -23,18 +22,18 @@ type peerConn struct {
 func InitPeerWire(
 	swarm tracker.Swarm,
 	myId string,
-	chanPeerWire chan internal.ControlMessage,
-	chanCore chan internal.ControlMessage,
+	chanPeerWire chan messages.ControlMessage,
+	chanCore chan messages.ControlMessage,
 	wait *sync.WaitGroup,
 	verbosity int,
 ) {
-	gob.Register(internal.HandShake{})
-	gob.Register(internal.Have{})
-	gob.Register(internal.Bitfield{})
-	gob.Register(internal.Request{})
-	gob.Register(internal.Reject{})
-	gob.Register(internal.Piece{})
-	gob.Register(internal.HelloDebug{})
+	gob.Register(messages.HandShake{})
+	gob.Register(messages.Have{})
+	gob.Register(messages.Bitfield{})
+	gob.Register(messages.Request{})
+	gob.Register(messages.Reject{})
+	gob.Register(messages.Piece{})
+	gob.Register(messages.HelloDebug{})
 
 	peerConn := peerConn{
 		conns:   make(map[string]net.Conn),
@@ -62,8 +61,8 @@ func InitPeerWire(
 			verbosity)
 		utils.Check(err, verbosity, "Error performing Handshake with peer: ", peer.Id[:5])
 		utils.PrintVerbose(verbosity, utils.VERBOSE, "Handshake with peer: ", peer.Id[:5], "sucessful")
-		chanPeerWire <- internal.ControlMessage{
-			Opcode:  internal.NEW_CONNECTION,
+		chanPeerWire <- messages.ControlMessage{
+			Opcode:  messages.NEW_CONNECTION,
 			PeerId:  peerId,
 			Payload: nil,
 		}
@@ -95,32 +94,23 @@ func InitPeerWire(
 func ListenForMessages(
 	peerConn *peerConn,
 	peerId string,
-	chanPeerWire chan internal.ControlMessage,
+	chanPeerWire chan messages.ControlMessage,
 	verbosity int,
 ) {
 	utils.PrintVerbose(verbosity, utils.DEBUG, "Starting listening for messages from peer: ", peerId[:5])
-	var msg internal.Message
+	var msg messages.Message
 	for {
 		err := peerConn.receive[peerId].Decode(&msg)
-		// verificar desconexão
-		if err == io.EOF {
-			utils.PrintVerbose(verbosity, utils.CRITICAL, "Peer: ", peerId[:5], "disconnected!")
+		// verificar desconexão ou erro de envio
+		if err != nil {
 			peerConn.lock.Lock()
-			delete(peerConn.conns, peerId)
-			delete(peerConn.send, peerId)
-			delete(peerConn.receive, peerId)
-			chanPeerWire <- internal.ControlMessage{
-				Opcode:  internal.DEAD_CONNECTION,
-				PeerId:  peerId,
-				Payload: nil,
-			}
+			DisconnectPeer(peerConn, chanPeerWire, peerId, verbosity)
 			peerConn.lock.Unlock()
 			return
 		}
-		utils.Check(err, verbosity, "Error receiving message from peer", peerId[:5])
 		opcode := MessageOpcode(msg)
 		utils.PrintVerbose(verbosity, utils.DEBUG, "Message from peer: ", peerId[:5], " opcode: ", opcode)
-		chanPeerWire <- internal.ControlMessage{
+		chanPeerWire <- messages.ControlMessage{
 			Opcode:  opcode,
 			PeerId:  peerId,
 			Payload: msg.Data,
@@ -130,27 +120,31 @@ func ListenForMessages(
 
 func ListenForCoreMessages(
 	peerConn *peerConn,
-	chanCore chan internal.ControlMessage,
+	chanCore chan messages.ControlMessage,
 	wait *sync.WaitGroup,
 	verbosity int,
 ) {
-	var controlMsg internal.ControlMessage
-	var peerMsg internal.Message
+	var controlMsg messages.ControlMessage
+	var peerMsg messages.Message
 	for {
 		controlMsg = <-chanCore
-		utils.PrintVerbose(verbosity, utils.DEBUG, "Message from core to ", controlMsg.PeerId)
-		peerMsg = internal.Message{Data: controlMsg.Payload}
+		peerMsg = messages.Message{Data: controlMsg.Payload}
 		if controlMsg.PeerId == "" { // Empty string is used to broadcast message
 			peerConn.lock.Lock()
 			for _, conn := range peerConn.send {
 				err := conn.Encode(peerMsg)
-				if err != io.EOF {
-					utils.Check(err, verbosity, "Error sending (brodcast) message to peer")
+				if err != nil {
+					DisconnectPeer(peerConn, chanCore, controlMsg.PeerId, verbosity)
 				}
 			}
 			peerConn.lock.Unlock()
 		} else {
-			peerConn.send[controlMsg.PeerId].Encode(peerMsg)
+			err := peerConn.send[controlMsg.PeerId].Encode(peerMsg)
+			if err != nil {
+				peerConn.lock.Lock()
+				DisconnectPeer(peerConn, chanCore, controlMsg.PeerId, verbosity)
+				peerConn.lock.Unlock()
+			}
 		}
 	}
 }
@@ -160,7 +154,7 @@ func ListenForConns(
 	myId,
 	fileId,
 	listenAddr string,
-	chanPeerWire chan internal.ControlMessage,
+	chanPeerWire chan messages.ControlMessage,
 	verbosity int,
 ) {
 	listener, err := net.Listen("tcp", listenAddr)
@@ -172,13 +166,16 @@ func ListenForConns(
 		gobSend := gob.NewEncoder(conn)
 		gobReceive := gob.NewDecoder(conn)
 		peerId, err := PerfomHandshake(gobSend, gobReceive, myId, fileId, verbosity)
-		utils.Check(err, verbosity, "Error in Handshake")
+		if err != nil {
+			utils.PrintVerbose(verbosity, utils.CRITICAL, "Error in Perfoming Handshake: ", err)
+			continue
+		}
 		peerConn.lock.Lock()
 		peerConn.conns[peerId] = conn
 		peerConn.send[peerId] = gobSend
 		peerConn.receive[peerId] = gobReceive
-		chanPeerWire <- internal.ControlMessage{
-			Opcode:  internal.NEW_CONNECTION,
+		chanPeerWire <- messages.ControlMessage{
+			Opcode:  messages.NEW_CONNECTION,
 			PeerId:  peerId,
 			Payload: nil,
 		}
@@ -194,37 +191,58 @@ func PerfomHandshake(
 	fileId string,
 	verbosity int,
 ) (string, error) {
-	myHandShake := internal.HandShake{
-		Pstr:   internal.PROTOCOL_ID,
+	myHandShake := messages.HandShake{
+		Pstr:   messages.PROTOCOL_ID,
 		IdHash: fileId,
 		PeerId: myId,
 	}
 
-	peerHandShake := internal.HandShake{}
+	peerHandShake := messages.HandShake{}
 	err := connSend.Encode(myHandShake)
-	utils.Check(err, verbosity, "Error sending Handshake")
-	err = connRecv.Decode(&peerHandShake)
-	utils.Check(err, verbosity, "Error receiving Handshake")
-	utils.PrintVerbose(verbosity, utils.DEBUG, "Handshake sucessful with peer: ", peerHandShake.PeerId[:5])
-	if peerHandShake.Pstr != internal.PROTOCOL_ID || fileId != peerHandShake.IdHash {
-		return "", fmt.Errorf("handshake failed")
+	if err != nil {
+		return "", fmt.Errorf("error sending handshake")
 	}
+	err = connRecv.Decode(&peerHandShake)
+	if err != nil {
+		return "", fmt.Errorf("error receiving handshake")
+	}
+	if peerHandShake.Pstr != messages.PROTOCOL_ID || fileId != peerHandShake.IdHash {
+		return "", fmt.Errorf("handshake failed: protocol id or file id mismatch")
+	}
+	utils.PrintVerbose(verbosity, utils.DEBUG, "Handshake sucessful with peer: ", peerHandShake.PeerId[:5])
 	return peerHandShake.PeerId, nil
 }
 
-func MessageOpcode(msg internal.Message) int {
+func MessageOpcode(msg messages.Message) int {
 	switch msg.Data.(type) {
-	case internal.Have:
-		return internal.HAVE
-	case internal.Bitfield:
-		return internal.BITFIELD
-	case internal.Request:
-		return internal.REQUEST
-	case internal.Piece:
-		return internal.PIECE
-	case internal.HelloDebug:
-		return internal.HELLO
+	case messages.Have:
+		return messages.HAVE
+	case messages.Bitfield:
+		return messages.BITFIELD
+	case messages.Request:
+		return messages.REQUEST
+	case messages.Piece:
+		return messages.PIECE
+	case messages.HelloDebug:
+		return messages.HELLO
 	default:
 		panic("Unknown message type received!")
+	}
+}
+
+func DisconnectPeer(
+	peerConn *peerConn,
+	chanPeerWire chan messages.ControlMessage,
+	peerId string,
+	verbosity int,
+) {
+	utils.PrintVerbose(verbosity, utils.CRITICAL, "Peer: ", peerId[:5], "disconnected!")
+	delete(peerConn.conns, peerId)
+	delete(peerConn.send, peerId)
+	delete(peerConn.receive, peerId)
+	chanPeerWire <- messages.ControlMessage{
+		Opcode:  messages.DEAD_CONNECTION,
+		PeerId:  peerId,
+		Payload: nil,
 	}
 }

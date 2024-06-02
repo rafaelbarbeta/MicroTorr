@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rafaelbarbeta/MicroTorr/pkg/internal"
+	"github.com/rafaelbarbeta/MicroTorr/pkg/messages"
 	"github.com/rafaelbarbeta/MicroTorr/pkg/mtorr"
 	"github.com/rafaelbarbeta/MicroTorr/pkg/utils"
 )
@@ -20,9 +20,9 @@ const (
 
 func InitCore(
 	mtorrent mtorr.Mtorrent,
-	chanPeerWire chan internal.ControlMessage,
-	chanCore chan internal.ControlMessage,
-	chanTracker chan internal.ControlMessage,
+	chanPeerWire chan messages.ControlMessage,
+	chanCore chan messages.ControlMessage,
+	chanTracker chan messages.ControlMessage,
 	myId string,
 	wait *sync.WaitGroup,
 	seed string,
@@ -32,8 +32,8 @@ func InitCore(
 		float64(mtorrent.Info.Length) / float64(mtorrent.Info.Piece_length),
 	))
 
-	chanPieceRequester := make(chan internal.ControlMessage)
-	chanPieceUploader := make(chan internal.ControlMessage)
+	chanPieceRequester := make(chan messages.ControlMessage)
+	chanPieceUploader := make(chan messages.ControlMessage)
 
 	PeerPieces := SyncPeerPieces{
 		Have:  make(map[string][]bool),
@@ -47,13 +47,19 @@ func InitCore(
 		Have:   make([]bool, numberOfPieces),
 	}
 
-	if seed != "" {
+	SeedMode := SeedMode{
+		SeedFile: seed,
+		active:   seed != "",
+		auto:     autoSeed,
+	}
+
+	if SeedMode.active {
 		var sha1hash strings.Builder
 		var data []byte
 		utils.PrintVerbose(verbosity, utils.VERBOSE, "Seed Mode active")
 		utils.PrintVerbose(verbosity, utils.VERBOSE, "Opening seed file ", seed)
 		// Open file and insert its pieces in the PieceBytes. Each piece has size of mtorrent.Info.Piece_length
-		file, err := os.Open(seed)
+		file, err := os.Open(SeedMode.SeedFile)
 		utils.Check(err, verbosity, "Error opening seed file")
 		for i := 0; i < numberOfPieces; i++ {
 			data = make([]byte, mtorrent.Info.Piece_length)
@@ -62,7 +68,6 @@ func InitCore(
 			pieceHash := fmt.Sprintf("%x", sha1.Sum(data[:n]))
 			sha1hash.WriteString(pieceHash)
 			PiecesBytes.AddPiece(data[:n], i)
-			PiecesBytes.AddHash(pieceHash, i)
 		}
 		file.Close()
 		// Making sure the file pieces are correct and match the mtorrent sha1 sum
@@ -74,9 +79,15 @@ func InitCore(
 		utils.PrintVerbose(verbosity, utils.VERBOSE, "File Loaded into memory")
 	}
 
+	//Load piece hashes into memory for integrity checking
+	for i := 0; i < numberOfPieces*40; i += 40 {
+		PiecesBytes.Hash[i/40] = mtorrent.Info.Sha1sum[i : i+40]
+	}
+
 	go ListenForMessages(
 		&PeerPieces,
 		&PiecesBytes,
+		&SeedMode,
 		numberOfPieces,
 		chanPeerWire,
 		chanCore,
@@ -89,12 +100,12 @@ func InitCore(
 		go PieceRequester(
 			&PeerPieces,
 			&PiecesBytes,
+			&SeedMode,
 			mtorrent,
 			numberOfPieces,
 			chanPieceRequester,
 			chanCore,
 			wait,
-			autoSeed,
 			verbosity,
 		)
 	}
@@ -113,39 +124,45 @@ func InitCore(
 func ListenForMessages(
 	PeerPieces *SyncPeerPieces,
 	PiecesBytes *PiecesBytes,
+	SeedMode *SeedMode,
 	numberOfPieces int,
-	chanPeerWire chan internal.ControlMessage,
-	chanCore chan internal.ControlMessage,
-	chanPieceRequester chan internal.ControlMessage,
-	chanPieceUploader chan internal.ControlMessage,
+	chanPeerWire chan messages.ControlMessage,
+	chanCore chan messages.ControlMessage,
+	chanPieceRequester chan messages.ControlMessage,
+	chanPieceUploader chan messages.ControlMessage,
 	wait *sync.WaitGroup,
 ) {
 	for {
 		msg := <-chanPeerWire
 		switch msg.Opcode {
-		case internal.NEW_CONNECTION:
+		case messages.NEW_CONNECTION:
 			PeerPieces.AddPeer(msg.PeerId, numberOfPieces)
-			chanCore <- internal.ControlMessage{
-				Opcode: internal.BITFIELD,
+			chanCore <- messages.ControlMessage{
+				Opcode: messages.BITFIELD,
 				PeerId: msg.PeerId,
-				Payload: internal.Bitfield{
+				Payload: messages.Bitfield{
 					Bitfield: PiecesBytes.Have,
 				},
 			}
-		case internal.DEAD_CONNECTION:
+		case messages.DEAD_CONNECTION:
 			PeerPieces.DeletePeer(msg.PeerId)
-			chanPieceRequester <- msg
-		case internal.HAVE:
-			PeerPieces.AddPiece(msg.PeerId, msg.Payload.(internal.Have).PieceIndex)
-		case internal.BITFIELD:
-			PeerPieces.SetBitfield(msg.PeerId, msg.Payload.(internal.Bitfield))
-		case internal.REQUEST:
+			if !SeedMode.active {
+				chanPieceRequester <- msg
+			}
+		case messages.HAVE:
+			PeerPieces.AddPiece(msg.PeerId, msg.Payload.(messages.Have).PieceIndex)
+		case messages.BITFIELD:
+			PeerPieces.SetBitfield(msg.PeerId, msg.Payload.(messages.Bitfield))
+		case messages.REQUEST:
 			chanPieceUploader <- msg
-		case internal.PIECE:
+		case messages.PIECE:
+			if SeedMode.active {
+				panic("PIECE received when in seed mode")
+			}
 			chanPieceRequester <- msg
-		case internal.HELLO:
+		case messages.HELLO:
 			fmt.Println("Received HELLO message: ",
-				msg.Payload.(internal.HelloDebug).Msg)
+				msg.Payload.(messages.HelloDebug).Msg)
 		default:
 			panic("Unknown message type received!")
 		}
@@ -155,19 +172,19 @@ func ListenForMessages(
 func PieceRequester(
 	PeerPieces *SyncPeerPieces,
 	PiecesBytes *PiecesBytes,
+	SeedMode *SeedMode,
 	mtorrrent mtorr.Mtorrent,
 	numberOfPieces int,
-	chanPieceRequester chan internal.ControlMessage,
-	chanCore chan internal.ControlMessage,
+	chanPieceRequester chan messages.ControlMessage,
+	chanCore chan messages.ControlMessage,
 	wait *sync.WaitGroup,
-	autoSeed bool,
 	verbosity int,
 ) {
 	var piecesIdx []int
 	var peers [][]string
 	var selectedPeer string
 	var selectedPiece, selectedPieceIdx int
-	var msg internal.ControlMessage
+	var msg messages.ControlMessage
 	var timeStart time.Time
 
 	utils.PrintVerbose(verbosity, utils.INFORMATION, "Waiting for seeder..")
@@ -181,7 +198,7 @@ func PieceRequester(
 	for {
 		piecesIdx, peers = PeerPieces.RarestPieces(PiecesBytes, numberOfPieces)
 		if len(piecesIdx) == 0 { // Only happens if all pieces have been downloaded already
-			AssemblePieces(mtorrrent, PiecesBytes, wait, autoSeed, verbosity)
+			AssemblePieces(mtorrrent, PiecesBytes, SeedMode, wait, verbosity)
 			break
 		}
 		selectedPiece, selectedPieceIdx = utils.RandomChoiceInt(piecesIdx)
@@ -195,17 +212,17 @@ func PieceRequester(
 		utils.PrintVerbose(verbosity, utils.DEBUG, "Requesting piece ", selectedPiece, " from peer ", selectedPeer)
 
 		timeStart = time.Now() // To calculate download speed
-		chanCore <- internal.ControlMessage{
-			Opcode: internal.REQUEST,
+		chanCore <- messages.ControlMessage{
+			Opcode: messages.REQUEST,
 			PeerId: selectedPeer,
-			Payload: internal.Request{
+			Payload: messages.Request{
 				PieceIndex: selectedPiece,
 			},
 		}
 
 		for {
 			msg = <-chanPieceRequester
-			if msg.PeerId != selectedPeer && msg.Opcode == internal.DEAD_CONNECTION {
+			if msg.PeerId != selectedPeer && msg.Opcode == messages.DEAD_CONNECTION {
 				continue
 			} else if msg.PeerId != selectedPeer {
 				utils.PrintVerbose(verbosity, utils.CRITICAL,
@@ -214,44 +231,46 @@ func PieceRequester(
 				continue
 			}
 			switch msg.Opcode {
-			case internal.PIECE:
+			case messages.PIECE:
 				duration := time.Since(timeStart).Seconds()
 				speed := float64(mtorrrent.Info.Piece_length) / duration
-				/*hashPiece := fmt.Sprintf("%x",
-					sha1.Sum(msg.Payload.(internal.Piece).Data),
-				)
-				if hashPiece != PiecesBytes.Hash[selectedPiece] {
-					utils.PrintVerbose(verbosity, utils.CRITICAL, "Piece Hash does not match!")
-					panic("Received Piece that doesn't match hashes!")
-				}*/
+				go func(selectedPiece int) { //Making sure gthe hashes match. Not ideal, but errors out if they don't
+					hashPiece := fmt.Sprintf("%x",
+						sha1.Sum(msg.Payload.(messages.Piece).Data),
+					)
+					if hashPiece != PiecesBytes.Hash[selectedPiece] {
+						utils.PrintVerbose(verbosity, utils.CRITICAL, "Piece Hash does not match!")
+						panic("Received Piece that doesn't match hashes!")
+					}
+				}(selectedPiece)
 				PeerPieces.SetSpeed(selectedPeer, speed)
-				PiecesBytes.AddPiece(msg.Payload.(internal.Piece).Data, msg.Payload.(internal.Piece).PieceIndex)
+				PiecesBytes.AddPiece(msg.Payload.(messages.Piece).Data, msg.Payload.(messages.Piece).PieceIndex)
 				utils.PrintVerbose(verbosity, utils.DEBUG,
 					"Piece: ",
-					msg.Payload.(internal.Piece).PieceIndex,
+					msg.Payload.(messages.Piece).PieceIndex,
 					" from: ", selectedPeer[:5],
 					"speed: ",
 					fmt.Sprintf("%.2f MB/s", speed/1000000.0),
 				)
-			case internal.REJECT:
+			case messages.REJECT:
 				PeerPieces.SetSpeed(selectedPeer, -1) // Avoids choosing this peer again
 				utils.PrintVerbose(verbosity, utils.DEBUG,
 					"Peer",
 					selectedPeer[:5],
 					"rejected piece ",
-					msg.Payload.(internal.Reject).PieceIndex)
-			case internal.DEAD_CONNECTION:
+					msg.Payload.(messages.Reject).PieceIndex)
+			case messages.DEAD_CONNECTION:
 				utils.PrintVerbose(verbosity, utils.DEBUG,
 					"Peer", selectedPeer[:5], "cannot send piece ",
-					msg.Payload.(internal.Reject).PieceIndex,
+					msg.Payload.(messages.Reject).PieceIndex,
 					" because it is dead")
 			default:
 				panic("Unknown message type received at PieceRequester!")
 			}
-			chanCore <- internal.ControlMessage{
-				Opcode: internal.HAVE,
+			chanCore <- messages.ControlMessage{
+				Opcode: messages.HAVE,
 				PeerId: "",
-				Payload: internal.Have{
+				Payload: messages.Have{
 					PieceIndex: selectedPiece,
 				},
 			}
@@ -263,8 +282,8 @@ func PieceRequester(
 func AssemblePieces(
 	mtorrent mtorr.Mtorrent,
 	PiecesBytes *PiecesBytes,
+	SeedMode *SeedMode,
 	wait *sync.WaitGroup,
-	autoSeed bool,
 	verbosity int,
 ) {
 	utils.PrintVerbose(verbosity, utils.VERBOSE, "All pieces downloaded. Assembling...")
@@ -286,8 +305,10 @@ func AssemblePieces(
 	err := os.WriteFile(mtorrent.Info.Name, data, 0644)
 	utils.Check(err, verbosity, "Failed to write assembled data to disk")
 	utils.PrintVerbose(verbosity, utils.VERBOSE, "Data dumped to disk")
-	if autoSeed {
+	if SeedMode.auto {
 		utils.PrintVerbose(verbosity, utils.VERBOSE, "Changed to seeding mode")
+		SeedMode.active = true
+		SeedMode.SeedFile = mtorrent.Info.Name
 	} else {
 		wait.Done()
 	}
@@ -296,24 +317,24 @@ func AssemblePieces(
 func PieceUploader(
 	PiecesBytes *PiecesBytes,
 	mtorrent mtorr.Mtorrent,
-	chanPieceUploader chan internal.ControlMessage,
-	chanCore chan internal.ControlMessage,
+	chanPieceUploader chan messages.ControlMessage,
+	chanCore chan messages.ControlMessage,
 	verbosity int,
 ) {
 	for {
 		msg := <-chanPieceUploader
 		go func() {
-			chanCore <- internal.ControlMessage{
-				Opcode: internal.PIECE,
+			chanCore <- messages.ControlMessage{
+				Opcode: messages.PIECE,
 				PeerId: msg.PeerId,
-				Payload: internal.Piece{
-					PieceIndex: msg.Payload.(internal.Request).PieceIndex,
-					Data:       PiecesBytes.Pieces[msg.Payload.(internal.Request).PieceIndex],
+				Payload: messages.Piece{
+					PieceIndex: msg.Payload.(messages.Request).PieceIndex,
+					Data:       PiecesBytes.Pieces[msg.Payload.(messages.Request).PieceIndex],
 				},
 			}
 			utils.PrintVerbose(
 				verbosity, utils.DEBUG,
-				"Sent piece ", msg.Payload.(internal.Request).PieceIndex,
+				"Sent piece ", msg.Payload.(messages.Request).PieceIndex,
 				" to: ", msg.PeerId[:5],
 			)
 		}()

@@ -1,4 +1,4 @@
-package internal
+package messages
 
 const (
 	PROTOCOL_ID = "MICROTORRv1"
@@ -36,8 +36,6 @@ type Bitfield struct {
 
 type Request struct {
 	PieceIndex int
-	//Begin      int Depois...
-	//Length     int
 }
 
 type Reject struct {
