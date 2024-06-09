@@ -66,7 +66,7 @@ func Announce(w http.ResponseWriter, r *http.Request) {
 
 	switch event {
 	case "started":
-		utils.PrintVerbose(verbosity, utils.VERBOSE, ipv4, ":Peer entered the swarm: ", swarmId)
+		utils.PrintVerbose(verbosity, utils.VERBOSE, ipv4, ":", port, " :Peer entered the swarm: ", swarmId)
 		startPeerTimer(swarmId, peerId, verbosity)
 		swarm.Peers[peerId] = Peer{Ip: ipv4, Port: port, Id: peerId}
 		swarmJson, error := json.Marshal(swarm)
@@ -76,12 +76,12 @@ func Announce(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(swarmJson)
 	case "stopped", "completed":
-		utils.PrintVerbose(verbosity, utils.VERBOSE, ipv4, ":Peer exited the swarm")
+		utils.PrintVerbose(verbosity, utils.VERBOSE, ipv4, ":", port, " :Peer exited the swarm")
 		delete(swarm.Peers, peerId)
 		delete(TimerChannels, swarmId+peerId)
 		w.Write([]byte("Peer exited the swarm"))
 	case "alive":
-		utils.PrintVerbose(verbosity, utils.DEBUG, ipv4, ":Peer is alive")
+		utils.PrintVerbose(verbosity, utils.DEBUG, ipv4, ":", port, " :Peer is alive")
 		chanPeer, ok := TimerChannels[swarmId+peerId]
 		if ok {
 			*chanPeer <- true

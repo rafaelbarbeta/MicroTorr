@@ -2,11 +2,14 @@ package utils
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"net"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/mitchellh/colorstring"
 )
 
 // Verbosity levels for PrintVerbose
@@ -36,15 +39,15 @@ func PrintVerbose(verbosity, priority int, message ...interface{}) {
 	var sb strings.Builder
 	switch priority {
 	case CRITICAL:
-		sb.WriteString("[CRITICAL]: ")
+		sb.WriteString(colorstring.Color("[red][CRITICAL]: "))
 	case DEBUG:
-		sb.WriteString("[DEBUG]: ")
+		sb.WriteString(colorstring.Color("[green][DEBUG]: "))
 	case INFORMATION:
-		sb.WriteString("[INFORMATION]: ")
+		sb.WriteString(colorstring.Color("[yellow][INFORMATION]: "))
 	case VERBOSE:
-		sb.WriteString("[VERBOSE]: ")
+		sb.WriteString(colorstring.Color("[blue][VERBOSE]: "))
 	default:
-		sb.WriteString("[VERBOSE]: ")
+		sb.WriteString(colorstring.Color("[blue][VERBOSE]: "))
 	}
 	for _, m := range message {
 		sb.WriteString(fmt.Sprintf("%v", m))
@@ -96,20 +99,20 @@ func GetInterfaceIP(name string) (string, error) {
 	return "", fmt.Errorf("no IPv4 address found for interface %s", name)
 }
 
-func Min(values []int) int {
+func MinWithExclusion(values []int, exclude []bool) int {
 	if len(values) == 0 {
 		return -1
 	}
-	min := values[0]
-	for _, v := range values {
-		if v < min {
+	min := math.MaxInt
+	for i, v := range values {
+		if v < min && !exclude[i] {
 			min = v
 		}
 	}
 	return min
 }
 
-func ContainsString(array []string, item string) bool {
+func Contains[T comparable](array []T, item T) bool {
 	for _, v := range array {
 		if v == item {
 			return true
@@ -130,4 +133,37 @@ func RandomChoiceInt(items []int) (int, int) {
 
 func RandomPercentChance(percent float64) bool {
 	return rand.Float64() <= percent
+}
+
+func Avg(values []float64) float64 {
+	if len(values) == 0 {
+		return 0
+	}
+	sum := 0.0
+	for _, v := range values {
+		sum += v
+	}
+	return sum / float64(len(values))
+}
+
+func Count[T comparable](values []T, item T) int {
+	counter := 0
+	for _, v := range values {
+		if v == item {
+			counter++
+		}
+	}
+	return counter
+}
+
+func UniqueValues[T comparable](values []T) []T {
+	unique := make([]T, 0)
+
+	for _, v := range values {
+		if !Contains(unique, v) {
+			unique = append(unique, v)
+		}
+	}
+
+	return unique
 }

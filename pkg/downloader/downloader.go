@@ -21,7 +21,12 @@ const (
 	MAX_CHAN_MESSAGES = 1000
 )
 
-func Download(mtorrent mtorr.Mtorrent, intNet, port, seed string, autoSeed bool, verbosity int) {
+func Download(
+	mtorrent mtorr.Mtorrent,
+	intNet, port, seed string,
+	autoSeed bool,
+	waitSeeders, waitLeechers, maxDownSpeed, maxUpSpeed, verbosity int,
+) {
 	var ip string
 	var err error
 	var wait sync.WaitGroup
@@ -49,7 +54,7 @@ func Download(mtorrent mtorr.Mtorrent, intNet, port, seed string, autoSeed bool,
 		port,
 		verbosity)
 
-	chanTracker := make(chan messages.ControlMessage, MAX_CHAN_TRACKER)
+	chanTracker := make(chan messages.ControlMessage)
 	chanPeerWire := make(chan messages.ControlMessage, MAX_CHAN_MESSAGES)
 	chanCore := make(chan messages.ControlMessage, MAX_CHAN_MESSAGES)
 
@@ -73,6 +78,8 @@ func Download(mtorrent mtorr.Mtorrent, intNet, port, seed string, autoSeed bool,
 		chanPeerWire,
 		chanCore,
 		&wait,
+		maxDownSpeed,
+		maxUpSpeed,
 		verbosity,
 	)
 
@@ -85,6 +92,8 @@ func Download(mtorrent mtorr.Mtorrent, intNet, port, seed string, autoSeed bool,
 		&wait,
 		seed,
 		autoSeed,
+		waitSeeders,
+		waitLeechers,
 		verbosity,
 	)
 

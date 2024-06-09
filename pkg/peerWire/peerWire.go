@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/conduitio/bwlimit"
 	"github.com/rafaelbarbeta/MicroTorr/pkg/messages"
 	"github.com/rafaelbarbeta/MicroTorr/pkg/tracker"
 	"github.com/rafaelbarbeta/MicroTorr/pkg/utils"
@@ -22,16 +23,14 @@ type peerConn struct {
 func InitPeerWire(
 	swarm tracker.Swarm,
 	myId string,
-	chanPeerWire chan messages.ControlMessage,
-	chanCore chan messages.ControlMessage,
+	chanPeerWire, chanCore chan messages.ControlMessage,
 	wait *sync.WaitGroup,
-	verbosity int,
+	maxDownSpeed, maxUpSpeed, verbosity int,
 ) {
 	gob.Register(messages.HandShake{})
 	gob.Register(messages.Have{})
 	gob.Register(messages.Bitfield{})
 	gob.Register(messages.Request{})
-	gob.Register(messages.Reject{})
 	gob.Register(messages.Piece{})
 	gob.Register(messages.HelloDebug{})
 
@@ -41,7 +40,6 @@ func InitPeerWire(
 		receive: make(map[string]*gob.Decoder),
 		lock:    sync.RWMutex{},
 	}
-
 	// Connect to all Peers and insert than in the map
 	// Also performs Handshake with each, so they know 'myId'
 	for _, peer := range swarm.Peers {
@@ -49,7 +47,8 @@ func InitPeerWire(
 			continue
 		}
 		utils.PrintVerbose(verbosity, utils.INFORMATION, "Connecting to peer: ", peer.Id[:5])
-		conn, err := net.Dial("tcp", peer.Ip+":"+strconv.Itoa(peer.Port))
+		dialer := bwlimit.NewDialer(&net.Dialer{}, bwlimit.Byte(maxUpSpeed)*bwlimit.KB, bwlimit.Byte(maxDownSpeed)*bwlimit.KB)
+		conn, err := dialer.Dial("tcp", peer.Ip+":"+strconv.Itoa(peer.Port))
 		utils.Check(err, verbosity, "Error connecting to peer: ", peer.Id[:5])
 		peerConn.conns[peer.Id] = conn
 		peerConn.send[peer.Id] = gob.NewEncoder(conn)
@@ -76,6 +75,8 @@ func InitPeerWire(
 		swarm.IdHash,
 		swarm.Peers[myId].Ip+":"+strconv.Itoa(swarm.Peers[myId].Port),
 		chanPeerWire,
+		maxDownSpeed,
+		maxUpSpeed,
 		verbosity,
 	)
 
@@ -151,16 +152,15 @@ func ListenForCoreMessages(
 
 func ListenForConns(
 	peerConn *peerConn,
-	myId,
-	fileId,
-	listenAddr string,
+	myId, fileId, listenAddr string,
 	chanPeerWire chan messages.ControlMessage,
-	verbosity int,
+	maxDownSpeed, maxUpSpeed, verbosity int,
 ) {
 	listener, err := net.Listen("tcp", listenAddr)
 	utils.Check(err, verbosity, "Error in ListenForConns")
+	listenerLimited := bwlimit.NewListener(listener, bwlimit.Byte(maxUpSpeed)*bwlimit.KB, bwlimit.Byte(maxUpSpeed)*bwlimit.KB)
 	for {
-		conn, err := listener.Accept()
+		conn, err := listenerLimited.Accept()
 		utils.Check(err, verbosity, "Error in Accepting new connection")
 		utils.PrintVerbose(verbosity, utils.VERBOSE, "New connection from: ", conn.RemoteAddr().String())
 		gobSend := gob.NewEncoder(conn)
@@ -187,8 +187,7 @@ func ListenForConns(
 func PerfomHandshake(
 	connSend *gob.Encoder,
 	connRecv *gob.Decoder,
-	myId,
-	fileId string,
+	myId, fileId string,
 	verbosity int,
 ) (string, error) {
 	myHandShake := messages.HandShake{

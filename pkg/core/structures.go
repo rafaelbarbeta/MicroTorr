@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 	"math"
+	"strings"
 	"sync"
 
 	"github.com/rafaelbarbeta/MicroTorr/pkg/messages"
@@ -28,6 +29,39 @@ type SeedMode struct {
 	auto     bool
 }
 
+type DownloadStats struct {
+	PiecesDownloaded []int     // All the pieces that have been downloaded
+	PiecesSpeed      []float64 // Speed of each piece
+	FromPeers        []string  // Peers that this piece index was downloaded from
+	FromSeeder       []bool    // Whether the piece was downloaded from a seeder
+}
+
+func (ds *DownloadStats) Update(piece int, speed float64, peer string, seeder bool) {
+	ds.PiecesDownloaded = append(ds.PiecesDownloaded, piece)
+	ds.PiecesSpeed = append(ds.PiecesSpeed, speed)
+	ds.FromPeers = append(ds.FromPeers, peer)
+	ds.FromSeeder = append(ds.FromSeeder, seeder)
+}
+
+func (ds *DownloadStats) String() string {
+	var stats strings.Builder
+	stats.WriteString("\n---------------- DOWNLOAD STATS ----------------\n")
+	stats.WriteString(fmt.Sprintf("Average speed: %.2f MB/s\n", utils.Avg(ds.PiecesSpeed)/1000000.0))
+	for _, peerId := range utils.UniqueValues(ds.FromPeers) {
+		stats.WriteString(fmt.Sprintf("Peer %v: %v%% of pieces downloaded\n ",
+			peerId[:5],
+			float64(utils.Count(ds.FromPeers, peerId))/
+				float64(len(ds.PiecesDownloaded))*100))
+	}
+	stats.WriteString(fmt.Sprintf("Downloaded from Seeders: %v%%\n",
+		float64(utils.Count(ds.FromSeeder, true))/
+			float64(len(ds.PiecesDownloaded))*100))
+
+	stats.WriteString("---------------- END ----------------\n")
+
+	return stats.String()
+}
+
 /*
 Returns the rarest pieces and the peers that have them.
 
@@ -42,6 +76,13 @@ func (sp *SyncPeerPieces) RarestPieces(PieceBytes *PiecesBytes, numberOfPieces i
 	peerHasPiece := make([][]string, numberOfPieces)
 	rarePieces := make([]int, 0)
 	peerHasRarePiece := make([][]string, 0)
+	// My pieces
+	for i := range rarities {
+		if PieceBytes.Have[i] {
+			rarities[i]++
+		}
+	}
+	// Peer pieces
 	for peer, have := range sp.Have {
 		for i := range have {
 			if have[i] {
@@ -51,7 +92,8 @@ func (sp *SyncPeerPieces) RarestPieces(PieceBytes *PiecesBytes, numberOfPieces i
 		}
 	}
 	sp.Lock.Unlock()
-	minRarity := utils.Min(rarities)
+	// Find rarest pieces that this client does not own already
+	minRarity := utils.MinWithExclusion(rarities, PieceBytes.Have)
 
 	for i := range rarities {
 		if rarities[i] == minRarity && !PieceBytes.Have[i] {
@@ -84,20 +126,37 @@ func (sp *SyncPeerPieces) QuickestPeer(peers []string) string {
 	}
 }
 
-func (sp *SyncPeerPieces) HasSeeder() bool {
-	for _, have := range sp.Have {
-		hasAllPieces := true
-		for _, truthValue := range have {
-			if !truthValue {
-				hasAllPieces = false
-				break
-			}
-		}
-		if hasAllPieces {
-			return true
+func (sp *SyncPeerPieces) NumSeeders() int {
+	sp.Lock.Lock()
+	count := 0
+	for peerId := range sp.Have {
+		if sp.IsSeeder(peerId) {
+			count++
 		}
 	}
-	return false
+	sp.Lock.Unlock()
+	return count
+}
+
+func (sp *SyncPeerPieces) NumLeechers() int {
+	numPeers := len(sp.Have)
+	return numPeers - sp.NumSeeders()
+}
+
+func (sp *SyncPeerPieces) IsSeeder(peerId string) bool {
+	hasAllPieces := true
+	for _, truthValue := range sp.Have[peerId] {
+		if !truthValue {
+			hasAllPieces = false
+			break
+		}
+	}
+
+	if hasAllPieces {
+		return true
+	} else {
+		return false
+	}
 }
 
 func (sp *SyncPeerPieces) SetSpeed(peerId string, speed float64) {

@@ -5,6 +5,8 @@ const (
 	// Opcodes
 	NEW_CONNECTION = iota
 	DEAD_CONNECTION
+	TRACKER_COMPLETED
+	TRACKER_STOPPED
 	HANDSHAKE
 	HAVE
 	BITFIELD
@@ -35,10 +37,6 @@ type Bitfield struct {
 }
 
 type Request struct {
-	PieceIndex int
-}
-
-type Reject struct {
 	PieceIndex int
 }
 
