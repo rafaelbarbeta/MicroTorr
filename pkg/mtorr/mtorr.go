@@ -43,8 +43,9 @@ func GenMtorrent(fileName string, tracker string, pieceLength int, verbose int) 
 	mtorrent.Info.Piece_length = pieceLength
 
 	for i := 0; i < length; i += pieceLength {
+		p := data[i:Min(i+pieceLength, length)]
 		utils.PrintVerbose(verbose, utils.DEBUG, "Piece", i/pieceLength)
-		sha1hash.WriteString(fmt.Sprintf("%x", sha1.Sum(data[i:i+pieceLength])))
+		sha1hash.WriteString(fmt.Sprintf("%x", sha1.Sum(p)))
 	}
 
 	mtorrent.Info.Sha1sum = sha1hash.String()
@@ -79,4 +80,11 @@ func (mtorrent Mtorrent) String() string {
 	mtorrentString += fmt.Sprintln("Sha1sum (first 20 bytes):", mtorrent.Info.Sha1sum[:20])
 	mtorrentString += fmt.Sprint("Id Hash:", mtorrent.Info.Id)
 	return mtorrentString
+}
+
+func Min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

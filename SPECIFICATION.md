@@ -73,16 +73,16 @@ When the program is executed in the command line, it will do the following actio
 
 Each peer will have a maximum of 1 download and floor(log2(number_of_peers)) of simultaneous uploads at any given time. Peers will always upload a piece when requested, as long it does not exceed the upload limit. If it is not the case, a reject message will be sent. The peer will either choose othe peer that has the same requested piece, or will try to get a lesser rare piece, as described bellow. For the sake of simplicity again, a piece rarity is classified by the number of peers that already downloaded it.
 
-Peers will try to download the "rarest" pieces first, following the BitTorrent protocol. The only exception is when a peer receives a reject message. If the are no other peer with the same piece, or they have also rejected the upload, he will try to get another random piece with "lower rarity", which is a piece with the number of +1 peers who have it, in comparison with the previous requested (and rejected) piece. If the piece is more widespread, the are probably more peers that have "free upload slots" available. He will try this again and again until finding someone, or in the worst scenario, whe will reset the algorithm. This may be very inefficient if the selected peers are always "busy", but the number of slots peer upload is enough for this "micro" implementation.
+Peers will try to download the "rarest" pieces first, following the BitTorrent protocol. 
 
-Peers will also save download delays from other peers in a "delay" structure. In the beginning, the "delay" for each peer is setted to 0, as a way to encourage trying other connections to get a piece, if possible.
+Peers will also save download delays from other peers in a "delay" structure. In the beginning, the "delay" for each peer is set to 0, as a way to encourage trying other connections to get a piece, if possible.
 In the case more than one peer have a selected piece, the tie is resolved by selected the peer with less known delay from the previous piece downloaded. If the delays are the same, the choice is random. Also, when a peer is rejected, it will save MaxInt as the peer delay value.
 
 This may deviates from the specification of BitTorrent, but again, for the sake of simplicity, this is the way the application will behave
 
-It is expected that the peers will at first download everthing from the seeders, and then will cooperate if they find that downloading from other peers is faster than dowloading from the seeder. 
+It is expected that the peers will at first download everything from the seeders, and then will cooperate if they find that downloading from other peers is faster than downloading from the seeder. 
 
-All received pieces are sorted and checked against its SHA1 checksum to ensure data integrity. All values are stored in RAM, and when all pieces arrive, it is dummped to disc. The client will enter seeder mode immediately, and will only upload from now on.
+All received pieces are sorted and checked against its SHA1 checksum to ensure data integrity. All values are stored in RAM, and when all pieces arrive, it is dumped to disc. The client will enter seeder mode immediately, and will only upload from now on.
 
 A client can also be started in seeder mode by specifying the complete file in command line.
 

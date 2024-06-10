@@ -64,8 +64,64 @@ This will drop the binary at /usr/local/bin while also configuring autocompletio
 
 No need to install go or anything
 
-## Execução
-Passos necessários para executar, rodar ou testar seu projeto. Vocês podem seguir o mesmo modelo dos exemplos de Instalação.
+## Running MicroTorr
+
+Let's build a simple torrent scenario to explore how MicroTorr locally.
+First, let's create a 100M random file with dd command called 'freeware':
+```bash
+dd if=/dev/urandom of=freeware bs=1M count=100
+```
+Next, we need to generate a metadata file for freeware
+```bash
+MicroTorr createMtorr freeware
+MicroTorr loadMtorr freware.mtorrent # Checking if .mtorrent was created successfully
+```
+Once the metadata file is created, we proceed to build a swarm, containing three peers: one is a "seeder" (has the whole file) and two "leechers" (does not have all files). They will discover themselves with help of a Tracker:
+```bash
+MicroTorr tracker -v 2
+```
+The terminal will hung. Let's start three new terminals, one for the seeder, and two for the leechers.
+
+Create peer1 and peer2 "home directory":
+```bash
+mkdir -p peer/peer1
+mkdir -p peer/peer2
+```
+
+cd to each of them in the different terminals.
+Start them by specifying the .mtorrent file alongside with verbosity mode, loopback interfaces and listening ports
+
+Leecher 1
+```bash
+MicroTorr download ../../freeware.mtorrent -i lo -p 1111 -v 2
+```
+
+Leecher 2
+```bash
+MicroTorr download ../../freeware.mtorrent -i lo -p 2222 -v 2
+```
+
+Now you probably see the tracker is receiving "alive" request from both peers. You might notice nothing happened except the "New Connection" messages, because they are waiting for at least one seeder to join the swarm. In this demonstration, we want to limit the seeder bandwidth to 3 MB/s max, so soon or later the leechers might cooperate to achieve a better download speed.
+
+In the seeder terminal, run:
+```bash
+MicroTorr download freeware.mtorrent -i lo -p 3333 -v 2 -s freeware -u 3000
+```
+
+Now watch the progress bar filling. As you seem, the progress bar starts filling up slow and with about 50% of download , it speeds up really quick. 
+
+In the printed statistics, you can see that about half of the file was download from the seeder, and the other half was download from the peer. This is because, following the "rarest piece first" piece download strategy, first each leecher downloads a piece that the minimum of peers currently hold in the swarm. This leads to a interesting behavior, as each leecher will download complimentary pieces first. After that, there will be a time where each piece is owned by the seeder and one of the other peers. Because the other leecher now also holds the remaining pieces of the file, leecher 1, for example, might as well try downloading a piece from the leecher 2. As he can notice, leecher 2 has a much faster upload speed then the seeder, so he will download the remaining pieces from him. The reverse is also true
+
+If you wish to make sure the arrived file is actually the one in the root directory, simply run this command for "freeware" for each "peer directory":
+
+```bash
+sha1sum < freeware
+```
+
+Hopefully, the output will be the same for all of them. And that's it!
+
+Try with other setups as well. Note that this can also run between different computers on the same LAN, or if you has access to different public IPv4, over the internet!
+
 
 ## Limitations
 
@@ -87,8 +143,6 @@ For those reasons, it is not optimized to download really large files over the i
 ## Author
 * ([Rafael Barbeta](https://github.com/rafaelbarbeta))
 
-## Demais anotações e referências (opcional)
-Aqui, o grupo pode colocar quaisquer outras informações que ache relevante, se assim desejar. Links de referências e materiais de estudo utilizados ou recomendados são sempre bem vindos. 
 
 ## Imagens/screenshots
 É necessário colocar pelo menos 3 imagens/screenshots do projeto, porém fiquem a vontade para colocar mais, a medida do que vocês acharem legal para ilustrar o projeto.
