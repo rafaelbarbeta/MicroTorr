@@ -25,3 +25,10 @@ main
 test_file
 *.mtorrent
 *.sh
+
+# Vscode specific
+.vscode
+
+# For building deb packages
+package
+*.deb

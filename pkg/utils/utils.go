@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -52,7 +53,13 @@ func PrintVerbose(verbosity, priority int, message ...interface{}) {
 	for _, m := range message {
 		sb.WriteString(fmt.Sprintf("%v", m))
 	}
+
+	clearLine()
 	fmt.Println(sb.String())
+}
+
+func clearLine() {
+	fmt.Print("\033[2K\r")
 }
 
 // GenerateRandomString generates a random string of length n
@@ -135,15 +142,23 @@ func RandomPercentChance(percent float64) bool {
 	return rand.Float64() <= percent
 }
 
-func Avg(values []float64) float64 {
-	if len(values) == 0 {
+func Median(data []float64) float64 {
+	dataCopy := make([]float64, len(data))
+	copy(dataCopy, data)
+
+	sort.Float64s(dataCopy)
+
+	var median float64
+	l := len(dataCopy)
+	if l == 0 {
 		return 0
+	} else if l%2 == 0 {
+		median = (dataCopy[l/2-1] + dataCopy[l/2]) / 2
+	} else {
+		median = dataCopy[l/2]
 	}
-	sum := 0.0
-	for _, v := range values {
-		sum += v
-	}
-	return sum / float64(len(values))
+
+	return median
 }
 
 func Count[T comparable](values []T, item T) int {

@@ -31,8 +31,7 @@ var (
 	TimerChannels = make(map[string]*chan bool)
 )
 
-func Announce(w http.ResponseWriter, r *http.Request) {
-	verbosity := utils.DEBUG // Verbosity is fixed for tracker requests for now
+func Announce(w http.ResponseWriter, r *http.Request, verbosity int) {
 	fmt.Println("Announce")
 	if r.Method != "GET" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)

@@ -14,11 +14,12 @@ import (
 	"github.com/rafaelbarbeta/MicroTorr/pkg/messages"
 	"github.com/rafaelbarbeta/MicroTorr/pkg/mtorr"
 	"github.com/rafaelbarbeta/MicroTorr/pkg/utils"
+	"github.com/schollz/progressbar/v3"
 )
 
 const (
-	OPPORTUNISTIC_CHOICE = 0.85
-	WAIT_DEFAULT_TIME    = 5 * time.Second
+	OPPORTUNISTIC_CHOICE = 0.9
+	WAIT_DEFAULT_TIME    = 200 * time.Millisecond
 )
 
 func InitCore(
@@ -36,6 +37,7 @@ func InitCore(
 
 	chanPieceRequester := make(chan messages.ControlMessage)
 	chanPieceUploader := make(chan messages.ControlMessage)
+	var bar *progressbar.ProgressBar
 	// Signal handling
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
@@ -82,6 +84,22 @@ func InitCore(
 			wait.Done()
 		}
 		utils.PrintVerbose(verbosity, utils.VERBOSE, "File Loaded into memory")
+	} else if verbosity != utils.DEBUG {
+		bar = progressbar.NewOptions(numberOfPieces*mtorrent.Info.Piece_length,
+			progressbar.OptionSetDescription("Downloading pieces"),
+			progressbar.OptionEnableColorCodes(true),
+			progressbar.OptionSetTheme(progressbar.Theme{
+				Saucer:        "[green]#[reset]",
+				SaucerHead:    "[yellow]>>[reset]",
+				SaucerPadding: " ",
+				BarStart:      "[",
+				BarEnd:        "]",
+			}),
+			progressbar.OptionShowBytes(true),
+			progressbar.OptionSetWidth(30),
+			progressbar.OptionSetPredictTime(true),
+			progressbar.OptionSetRenderBlankState(false),
+		)
 	}
 
 	//Load piece hashes into memory for integrity checking
@@ -115,6 +133,7 @@ func InitCore(
 			waitSeeders,
 			waitLeechers,
 			verbosity,
+			bar,
 		)
 	}
 

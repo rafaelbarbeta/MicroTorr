@@ -1,76 +1,91 @@
-Este Readme é um modelo que pode ser usado para os repositórios no GitHub de projetos feitos para a atividade de Extensão Hackerspace, da Universidade Federal de São Carlos - Campus Sorocaba, organizada pelo hackerspace [HackoonSpace](https://hackoonspace.com/). É importante observar que alguns campos e informações são opcionais, e que não é necessário seguir rigorosametne o modelo proposto. O objetivo é que, obrigatóriamente, os grupos coloquem em seus repositórios as informações requisitadas aqui, porém o formato em si pode ou não seguir o modelo.
+# MicroTorr: Peer to Peer file sharing inspired by BitTorrentV1
 
-Além disso, para cada tópico, existem alguns possíveis exemplos de como o grupo pode apresentar as informações sobre o projeto (ex: lista enumerada, texto descritivo, etc). Alguns tópicos possuem comandos que só podem ser melhor visualizados na versão Raw ou txt do Readme.
+## About this project
+Simplified implementation of a peer to peer (P2P) file sharing network, inspired by BitTorrent V1, written in Go language. Ships with a CLI interface made with Cobra CLI.
 
-É preferível que a linguagem da documentação esteja em português, mas também é aceito que esteja em inglês.
+This project is capable of running a full simulation of a minimum P2P swarm, including the Tracker server, torrent client, and bencoding a file for sharing with this software. It does implements most of the basic concepts of the BitTorrent protocol, such as:
 
-Para responder quaisquer dúvidas, entrar em contato com a equipe do HackoonSpace.
+* Generation of ".torrent" metadata files, with the bencode encoding algorithm
+* Peer discovery with Tracker links and timeouts
+* Multiple torrent swarms on the same tracker
+* "Rarest piece first" download strategy
+* Automatic change to seeding mode once download is completed
+* Peer selection based on estimated bandwidth and connection speed
+* Integrity checking with SHA1 hashing algorithm
 
-# Titulo do projeto
-
-## Conceito do projeto
-Aqui vocês definem o conceito do projeto, explicando sucintamente sobre o que ele se trata, qual a finalidade/utilidade, etc. 1-2 parágrafos já são suficientes, desde que bem explicados, mas sintam-se a vontade para escrever mais. Também sintam-se a vontade para usar a criatividade.
-
-### Exemplo:
-
-Este projeto foi desenvolvido com o intuíto de facilitar a manuntenção de aplicações Web contra invasões indesejadas do tipo XYZ. Para isto, foi implementado um programa que realizasse a checagem de pacotes recebidos por um Website com host local em uma máquina com Windows, buscando traços de possíveis códigos maliciosos que possam interferir na execução habitual do servidor da aplicação.
+On top of that, MicroTorr includes its own features for easy of execution:
+* Maximum uploading and downloading speed setting
+* Wait for X amount of seeders and Y of leechers before downloading
+* Progress Bar for download progress
+* Different Levels (and colors) of program verbosity
+* Command completion, provided by Cobra CLI
   
-## Pré-requisitos e recursos utilizados
-Citação das linguagens, bibliotecas, peças de hardware, e outras coisas que o grupo utilizou para realizar o projeto. Não é necessário explicar qual foi o uso exato de cada coisa no projeto. Bibliotecas e recursos padrões das tecnologias utilizadas não precisam ser citados (ex: stdio.h, iostream.h, etc.).
+## Dependencies and Auxiliary resources
+This project is made entirely in Go, and implements most BitTorrent features "from the ground up". Here is a list of third party modules used for building the application:
 
-Se alguma biblioteca externa ou código de outra pessoa foi utilizado como recurso, é importante citar a fonte de onde vocês retiraram (pode ser o link no Github, ou tutorial usado como referência).
+1. [Cobra Cli](https://github.com/spf13/cobra)
+2. [Bencode Encoding](https://github.com/jackpal/bencode-go)
+3. [Bandwidth Limiting](https://github.com/conduitio/bwlimit)
+4. [Progress Bar](https://github.com/schollz/progressbar)
 
-### Exemplo:
-
-O grupo utilizou a linguagem C para desenvolver a implementação geral do projeto, além de importar as seguintes bibliotecas:
-1. abcdzd.h
-2. exemplo.h, disponível em [IstoEhApenasUmExemplo](https://github.com/istoehapenasumexemplo/minhabiblioteca)
-
-Também foi utilizado o tutorial disponível em [IstoEhOutroExemplo](https://github.com/istoehoutroexemplo/oi) como base para o grupo compreender a implementação da função X dentro da linguagem em questão.
+For reference, this is the specification of the [BitTorrent protocol v1](https://wiki.theory.org/BitTorrentSpecification) this project was inspired from.
   
 ## Passo a passo
 Passos que o grupo realizou para criar, implementar ou projetar o projeto. É importante descrever pelo menos o mais importante para que outras pessoas compreendam como o grupo conseguiu realizar o projeto, quais as atividades feitas, etc, e possam ter meios compreender como reproduzir o projeto, se assim fosse necessário.
 
 Se possível, é legal citar o nome dos arquivos implementados, se forem poucos. Por exemplo, se o seu projeto tiver 4 arquivos, cada um com uma função, citar o nome deles na parte do passo a passo correspondente. Se forem muitos arquivos para uma mesma coisa, não tem problema, podem deixar sem ou deixar apenas o nome da pasta.
 
-### Exemplo:
 
-1. Baixamos o material disponível em [Material](https://materialdeexemplodohackerspace.com.br)
-2. Estudamos como o código do material anterior funciona
-3. Implementamos um programa que se comunicasse com o código compreendido (comunicacao.c e comunicacao.h)
-4. Implementamos uma interface gráfica para utilizar o programa de comunicação de forma mais intuitiva.
+## Install
 
-## Instalação
-Passos necessários para instalar ou recriar seu projeto, se assim for necessário. A descrição dos passos não precisa ser complexa. É necessário apenas o mais importante para que outras pessoas saibam como fazê-lo.
+### Install from source
 
-### Exemplos:
-a)
-  ```
-  Execute o comando X Y Z, no terminal, na pasta do projeto
-  ```
-b)
-  1. Abra a pasta 
-  2. Execute o comando A B C no terminal
-  3. Compile os arquivos X, Y e Z juntos
-  4. Crie um arquivo W.txt de entrada
+In order to install from source, you need the go compiler. You can follow the steps from the official documentation: [Go Download and install](https://go.dev/doc/install)
+
+Next, clone the repository, install the binary and add the autocomplete script to your shell of choice. Assuming you use the bash shell, these are the commands needed to setup MicroTorr:
+
+```bash
+git clone https://github.com/rafaelbarbeta/MicroTorr
+cd MicroTorr
+go install 
+MicroTorr completion bash > microtorr # Check your PATH variable if this fails!
+sudo cp microtorr /etc/bash_completion.d/microtorr
+```
+
+Restart your shell. Now you can run MicroTorr with autocompletion!
+
+### Install with debian package (Recommended)
+
+Simply download the .deb package in "Releases" and run:
+```bash
+sudo dpkg -i microtorr.deb
+```
+This will drop the binary at /usr/local/bin while also configuring autocompletion on bash shell.
+
+No need to install go or anything
 
 ## Execução
 Passos necessários para executar, rodar ou testar seu projeto. Vocês podem seguir o mesmo modelo dos exemplos de Instalação.
 
-## Bugs/problemas conhecidos
-Lista de possíveis problemas, bugs, falhas ou comportamentos esquisitos que o grupo conheça sobre o projeto. Esta seção é importante para que outras pessoas saibam quais tipos de erros elas podem encontrar. Seria legal citar motivos que o grupo acredita que sejam os causadores destas coisas, mas não é obrigatório.
+## Limitations
 
-### Exemplo:
+Please note that this code *does not work as BitTorrent client*, and therefore cannot download torrents from the internet. It is instead a didatic simulation of how the protocol works under the hood. I made it as a way to challenge myself with concurrent programming, networking and of course, the Go language and its ecosystem. Also, I wanted to learn how this protocol actually worked, as I was completely unaware of its inner working until building this code. Bear in mind that some features of the BitTorrent protocol are stripped from this implementation, such as 
 
-O projeto possui uma falha ao abrir a aba INICIO, após realizar uma inserção com caractéres acentuados. Também foi encontrada uma falha ao definir a tela de fundo com a cor Roxa, provavelmente por conta da palheta de cores limitada da tecnologia que foi utilizada.
+* Chocking, and Opportunistic unchocking
+* Tit-for-Tat behavior (it does kind of behave that way nevertheless)
+* Download and Upload 'slots'
+* Retransmission of broken pieces (sha1 detected)
+* NAT transversal techniques for peers under NAT
+* DHT (Distributed Hash Table)
+* Encryption
+* Magnet Links
 
-## Autores
-Aqui, é importante referenciar o nome dos integrantes do grupo. Não precisa de RA. Outras informações, como contato ou perfil no Github, ficam a critério do grupo. Se o grupo for muito grande, é bom referenciar as funções de cada um.
+And some others. 
+For those reasons, it is not optimized to download really large files over the internet. See the [qbittorrent](https://github.com/qbittorrent/qBittorrent) for this (don't be evil XD)
 
-### Exemplo:
-* Marcus Vinícius N. Garcia ([Infinitemarcus](https://github.com/Infinitemarcus))
-* Garcia Neto Junior da Silva
-* João das Neves - Desenvolvedor do Back-End
+
+## Author
+* ([Rafael Barbeta](https://github.com/rafaelbarbeta))
 
 ## Demais anotações e referências (opcional)
 Aqui, o grupo pode colocar quaisquer outras informações que ache relevante, se assim desejar. Links de referências e materiais de estudo utilizados ou recomendados são sempre bem vindos. 

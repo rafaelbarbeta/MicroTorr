@@ -10,6 +10,7 @@ import (
 	"github.com/rafaelbarbeta/MicroTorr/pkg/messages"
 	"github.com/rafaelbarbeta/MicroTorr/pkg/mtorr"
 	"github.com/rafaelbarbeta/MicroTorr/pkg/utils"
+	"github.com/schollz/progressbar/v3"
 )
 
 func PieceRequester(
@@ -21,6 +22,7 @@ func PieceRequester(
 	chanPieceRequester, chanCore, chanTracker chan messages.ControlMessage,
 	wait *sync.WaitGroup,
 	waitSeeders, waitLeechers, verbosity int,
+	bar *progressbar.ProgressBar,
 ) {
 	var piecesIdx []int
 	var peers [][]string
@@ -47,7 +49,7 @@ func PieceRequester(
 	for {
 		piecesIdx, peers = PeerPieces.RarestPieces(PiecesBytes, numberOfPieces)
 		if len(piecesIdx) == 0 { // Only happens if all pieces have been downloaded already
-			AssemblePieces(mtorrrent, PiecesBytes, SeedMode, chanTracker, &stats, wait, verbosity)
+			AssemblePieces(mtorrrent, PiecesBytes, SeedMode, chanTracker, &stats, wait, verbosity, bar)
 			break
 		}
 		selectedPiece, selectedPieceIdx = utils.RandomChoiceInt(piecesIdx)
@@ -104,10 +106,13 @@ func PieceRequester(
 				msg.Payload.(messages.Piece).PieceIndex,
 				" from: ", selectedPeer[:5],
 				"speed: ",
-				fmt.Sprintf("%.2f MB/s", speed/1000000.0),
+				fmt.Sprintf("%.3f MB/s", speed/1000000.0),
 			)
 			stats.Update(msg.Payload.(messages.Piece).PieceIndex,
 				speed, selectedPeer, PeerPieces.IsSeeder(selectedPeer))
+			if verbosity != utils.DEBUG {
+				bar.Add(mtorrrent.Info.Piece_length)
+			}
 		case messages.DEAD_CONNECTION:
 			utils.PrintVerbose(verbosity, utils.DEBUG,
 				"Peer", selectedPeer[:5], "cannot send piece ",
@@ -134,7 +139,11 @@ func AssemblePieces(
 	stats *DownloadStats,
 	wait *sync.WaitGroup,
 	verbosity int,
+	bar *progressbar.ProgressBar,
 ) {
+	if verbosity != utils.DEBUG {
+		bar.Exit()
+	}
 	utils.PrintVerbose(verbosity, utils.VERBOSE, "All pieces downloaded. Assembling...")
 
 	var data []byte

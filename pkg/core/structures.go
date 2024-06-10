@@ -46,9 +46,9 @@ func (ds *DownloadStats) Update(piece int, speed float64, peer string, seeder bo
 func (ds *DownloadStats) String() string {
 	var stats strings.Builder
 	stats.WriteString("\n---------------- DOWNLOAD STATS ----------------\n")
-	stats.WriteString(fmt.Sprintf("Average speed: %.2f MB/s\n", utils.Avg(ds.PiecesSpeed)/1000000.0))
+	stats.WriteString(fmt.Sprintf("Average speed: %.3f MB/s\n", utils.Median(ds.PiecesSpeed)/1000000.0))
 	for _, peerId := range utils.UniqueValues(ds.FromPeers) {
-		stats.WriteString(fmt.Sprintf("Peer %v: %v%% of pieces downloaded\n ",
+		stats.WriteString(fmt.Sprintf("Peer %v: %v%% of pieces downloaded\n",
 			peerId[:5],
 			float64(utils.Count(ds.FromPeers, peerId))/
 				float64(len(ds.PiecesDownloaded))*100))

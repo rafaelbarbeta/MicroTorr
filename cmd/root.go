@@ -1,5 +1,5 @@
 /*
-Copyright © 2024 NAME HERE <EMAIL ADDRESS>
+Copyright © 2024 Rafael Barbeta rafa.barbeta@gmail.com
 */
 package cmd
 
