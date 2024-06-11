@@ -1,5 +1,7 @@
 # MicroTorr: Peer to Peer file sharing inspired by BitTorrentV1
 
+![Logo](img/microtorr.jpg)
+
 ![Demo](img/torrent.gif)
 
 ## About this project
