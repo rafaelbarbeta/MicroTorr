@@ -1,5 +1,7 @@
 # MicroTorr: Peer to Peer file sharing inspired by BitTorrentV1
 
+![Demo](img/torrent.gif)
+
 ## About this project
 Simplified implementation of a peer to peer (P2P) file sharing network, inspired by BitTorrent V1, written in Go language. Ships with a CLI interface made with Cobra CLI.
 
@@ -30,11 +32,88 @@ This project is made entirely in Go, and implements most BitTorrent features "fr
 
 For reference, this is the specification of the [BitTorrent protocol v1](https://wiki.theory.org/BitTorrentSpecification) this project was inspired from.
   
-## Passo a passo
-Passos que o grupo realizou para criar, implementar ou projetar o projeto. É importante descrever pelo menos o mais importante para que outras pessoas compreendam como o grupo conseguiu realizar o projeto, quais as atividades feitas, etc, e possam ter meios compreender como reproduzir o projeto, se assim fosse necessário.
+## About the implementation
 
-Se possível, é legal citar o nome dos arquivos implementados, se forem poucos. Por exemplo, se o seu projeto tiver 4 arquivos, cada um com uma função, citar o nome deles na parte do passo a passo correspondente. Se forem muitos arquivos para uma mesma coisa, não tem problema, podem deixar sem ou deixar apenas o nome da pasta.
+This code is composed of 3 different parts: a metadata (.mtorrent) generator and loader, tracker and the torrent client. Here is a brief explanation of each part
 
+### .mtorrent generator
+
+```bash
+MicroTorr createMtorr test_file # Creates a .mtorrent
+MicroTorr loadMTorr # Shows .mtorrent info
+```
+
+It is responsible to generate the metadata require for "dividing" a file into pieces and help peers connect to each other. It uses bencode, just like BitTorrent, to encode these fields:
+
+* announce: Has the url of the tracker.
+* info, which contains the values: length, file name, piece length, pieces sha1 concatenation, id_hash
+
+Apart from id_hash, which is a sha1 of the whole file, all field are the same ones as the BitTorrent .torrent file structure.
+
+### Tracker
+
+```bash
+MicroTorr tracker
+```
+
+Provides just one endpoint: "GET /annouce" with parameters:
+* info_hash: 20-byte SHA-1 hash of the info dictionary from the .mtorrent file.
+In this case, is id_hash.
+* peer_id: 20 byte randomly generated id
+* ip: peer ip
+* port: The port number the peer is listening on.
+* event: The event type. Ca be "started", "stopped", "completed", "alive".
+
+The response is a json that contains only the peer's IP addresses, their listening ports, and ids. Once a peer makes this request, he is added to the peer list of the info_hash swarm.
+
+Peers in MicroTorr will always connect to all other available peers.
+Peers are supposed to continue sending GET requests, with the same parameters and event "alive". Peers that do not send a GET request within a time span of 30 seconds, will be considered dead, and removed from peers list.
+
+They can also alert the tracker a voluntary exit, with "completed" when has all pieces, and "stopped", when the download is canceled by the user (by sending a interrupt signal)
+
+### Torrent client
+
+```bash
+MicroTorr download test_file.mtorrent # Leech mode or download
+MicroTorr download test_file.mtorrent -s test_file # Seed mode or upload
+```
+
+Responsible for downloading pieces from other peers in order to get the requested file. Peers can attach to the swarm as either in leech mode or seed mode, the difference being that the later has the whole file loaded and chucked into memory. This itself is composed of three main components: core, peerWire and trackerController
+
+#### Tracker Controller
+
+Sends the keep alive to the tracker. Also, it communicates with the Core component to inform the Tracker of completed or stopped status. 
+
+Provides a way of retrieving tracker data.
+
+#### Peer Wire
+
+Responsible to manage raw sockets, TCP connections, bandwidth limitations, connect new peers, disconnect peers, serialize messages and send and receive data. It is run on a separate go routine, and serves as an abstraction to the "core" component, by allowing the core send structured data into a channel, with a peerId as a destination and receive a response on another channel. All the process of dealing with the subjacent network is hidden by this component.
+
+It also performs the initial handshake to every new connection, and generates a control message for the core with the new peer id to be added.
+
+#### Core
+
+Performs the central logic of the program, such as determining which piece to download, dealing with peer updates and its own updates as well as send and receive pieces. 
+
+In total, there are 4 types of messages this protocol can send
+
+* have: Advertise to other peers a newer downloaded piece, so they can update which peers have which pieces
+* bitfield: indicates all the pieces a peer has or not. Is sent always when a new connection is made, and only once by the owner.
+* request: Used to request a block.
+* piece: The actual block piece
+
+Request and Piece is treated by two separated go routines, namely PieceRequester and PieceUploader respectively.
+
+PieceRequester will continually request pieces in the channel with the Peer Wire component, following the rarest piece first. A counting occurs to determine which piece (or pieces) have the minimum of peers that own them. Once those pieces are found, then PieceRequester will randomly choose a piece among all of the rare pieces and choose a peer that has this piece and also is the fastest peer known. 
+
+This last step happens about 90% of the times, and in the remaining 10% it chooses a random peer. 
+
+This is to hopefully choose a peer that is quicker than thought, as the peer speeds are only measured when a piece is downloaded (in a nutshell, if a peer is never selected, then his speed will never be updated, so eventually, we may choose him so there is probability his faster than thought initially).
+Once selected, the piece is requested and PieceRequester waits for its arrival.
+At the other end, a PiceUploader go routine will take this request and always send the piece. A SHA1 integrity check is made to ensure the piece is equal to what is expected. 
+
+Once all pieces arrives, PieceRequester will call AssemblePieces to dump the whole file into disk, and alerts the Tracker Controller the download is done.
 
 ## Install
 
@@ -66,7 +145,7 @@ No need to install go or anything
 
 ## Running MicroTorr
 
-Let's build a simple torrent scenario to explore how MicroTorr locally.
+Let's build a simple torrent scenario to explore MicroTorr locally.
 First, let's create a 100M random file with dd command called 'freeware':
 ```bash
 dd if=/dev/urandom of=freeware bs=1M count=100
@@ -144,11 +223,15 @@ For those reasons, it is not optimized to download really large files over the i
 * ([Rafael Barbeta](https://github.com/rafaelbarbeta))
 
 
-## Imagens/screenshots
-É necessário colocar pelo menos 3 imagens/screenshots do projeto, porém fiquem a vontade para colocar mais, a medida do que vocês acharem legal para ilustrar o projeto.
+## Screenshots
 
-Para colocar imagens no Readme do Github, vocês podem usar o seguinte comando (abrir este Readme no modo raw ou como txt):
+![tracker](img/tracker.png)
 
-![Imagem](https://github.com/hackoonspace/Hackoonspace-template/blob/master/exemplo.png)
+![debug](img/debugpng.png)
 
-É preferível que vocês usem imagens hospedadas no próprio GitHub do projeto. É só referenciar o link delas no comando acima.
+![leecher](img/leecher.png)
+
+![stats](img/stats.png)
+
+![mtorr](img/mtorr.png)
+
