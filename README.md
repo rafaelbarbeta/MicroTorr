@@ -5,7 +5,7 @@
 ![Demo](img/torrent.gif)
 
 
-[Leia esta página em português](https://github.com/rafaelbarbeta/MicroTorr/edit/main/README-pt.md)
+[Leia esta página em português](https://github.com/rafaelbarbeta/MicroTorr/blob/main/README-pt.md)
 ## About this project
 Simplified implementation of a peer to peer (P2P) file sharing network, inspired by BitTorrent V1, written in Go language. Ships with a CLI interface made with Cobra CLI.
 
